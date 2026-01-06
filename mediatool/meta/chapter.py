@@ -5,11 +5,14 @@ from pathlib import Path
 
 import ffmpeg
 import pendulum
-from awelive.helper import copy_meta, get_video_info, rename_video
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import get_video_path
+from mediatool.helper import (
+    copy_meta, get_video_info,
+    get_video_path,
+    rename_video
+)
 
 app = Typer()
 
