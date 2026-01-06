@@ -1,12 +1,13 @@
 import itertools
 import json
 import subprocess
+from collections import defaultdict
 from pathlib import Path
 
 import ffmpeg
 from awelive.helper import copy_meta, get_video_info, get_video_path
 from pytimedinput import timedInput
-from rich.prompt import Confirm
+from rich.prompt import Confirm, Prompt
 from typer import Typer
 
 from mediatool import console
@@ -39,6 +40,63 @@ def convert_to_h264(video: Path):
     (ffmpeg.input(filename=str(video), fflags='+genpts+discardcorrupt', noautorotate=None)
      .output(filename=str(new_video), avoid_negative_ts='make_zero', map=0, **args)
      .run(overwrite_output=False))
+
+
+@app.command()
+def reencoding(target: Path, using_self: bool = False):
+    if using_self:
+        assert target.is_file()
+        ref = None
+    else:
+        ref = Prompt.ask("Enter reference path").strip()
+        ref = Path(ref.strip())
+        assert ref.exists()
+    for video in get_video_path(target):
+        reencoding_video(video, ref)
+
+
+def reencoding_video(target_video: Path,  reference_video: Path = None):
+    is_self = False
+    if not reference_video:
+        # to strip dobly info to aviod concat fail
+        reference_video = target_video
+        is_self = True
+    info = ffmpeg.probe(reference_video, show_chapters=None)
+    streams = defaultdict(list)
+    for s in info['streams']:
+        if s['codec_name'] in ['mjpeg', 'png']:
+            assert s['codec_type'] == 'video'
+            streams['cover'].append(s)
+        else:
+            streams[s['codec_type']].append(s)
+    a_stream, *_ = streams.pop('audio', [None])
+    assert not _
+    v_stream, *_ = streams.pop('video', [None,])
+    assert not _
+    video_params = {
+        'vcodec': v_stream['codec_name'],
+        'pix_fmt': v_stream['pix_fmt'],
+        'r': eval(v_stream['r_frame_rate']),
+        's': f"{v_stream['width']}x{v_stream['height']}",
+        'crf': 18,
+    }
+    if is_self:
+        audio_params = {'acodec': 'copy'}
+    else:
+        audio_params = {
+            'acodec': a_stream['codec_name'],
+            'ar': int(a_stream['sample_rate']),
+            'ac': a_stream['channels']
+        }
+    command = ffmpeg.input(target_video).output(
+        filename=target_video.with_name(
+            f'{target_video.stem}_encoded{reference_video.suffix}'),
+        preset='ultrafast',
+        **video_params,
+        **audio_params,
+    )
+    print(command.compile())
+    command.run()
 
 
 @app.command()
