@@ -8,8 +8,7 @@ from awelive.helper import copy_meta, get_video_info, rename_video, write_xmp
 from typer import Typer
 
 from mediatool import console
-
-from .chapter import get_chapters_text, write_chapters
+from mediatool.meta.chapter import get_chapters_text, write_chapters
 
 app = Typer()
 

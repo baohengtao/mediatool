@@ -1,8 +1,8 @@
 
 from typer import Typer
 
-from . import concat, transform, trim
+from . import chapter, cover
 
 app = Typer()
-for app_ in [concat.app, transform.app, trim.app]:
+for app_ in [chapter.app, cover.app]:
     app.registered_commands += app_.registered_commands
