@@ -5,12 +5,13 @@ from collections import defaultdict
 from pathlib import Path
 
 import ffmpeg
-from awelive.helper import copy_meta, get_video_info, get_video_path
+from awelive.helper import copy_meta, get_video_info
 from pytimedinput import timedInput
 from rich.prompt import Confirm, Prompt
 from typer import Typer
 
 from mediatool import console
+from mediatool.helper import get_video_path
 
 app = Typer()
 

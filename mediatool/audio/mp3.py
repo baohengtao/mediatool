@@ -3,11 +3,12 @@ from pathlib import Path
 
 import ffmpeg
 import pendulum
-from awelive.helper import get_video_path, get_xmp
+from awelive.helper import get_xmp
 from mutagen.mp4 import MP4, MP4Cover
 from typer import Typer
 
 from mediatool import DATA_PATH, console
+from mediatool.helper import get_video_path
 
 app = Typer()
 

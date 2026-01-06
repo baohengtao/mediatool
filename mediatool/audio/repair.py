@@ -2,15 +2,12 @@ import itertools
 from pathlib import Path
 
 import ffmpeg
-from awelive.helper import (
-    copy_meta, get_video_info,
-    get_video_path, get_xmp,
-    write_xmp
-)
+from awelive.helper import copy_meta, get_video_info, get_xmp, write_xmp
 from rich.prompt import Confirm
 from typer import Typer
 
 from mediatool import console
+from mediatool.helper import get_video_path
 
 app = Typer()
 
