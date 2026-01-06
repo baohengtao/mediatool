@@ -21,6 +21,52 @@ app = Typer()
 
 
 @app.command()
+def fix_srt(paths: list[Path]):
+    for srt in paths:
+        if srt.suffix != '.srt':
+            continue
+        console.log(f'fixing {srt}')
+        subs = SubRipFile.open(srt)
+        merged = []
+        for sub in subs:
+            if merged and sub.text == merged[-1].text:
+                if (diff := sub.start.ordinal - merged[-1].end.ordinal) <= 100:
+                    merged[-1].end = sub.end
+                    continue
+                else:
+                    console.log(
+                        f'find samed subtitle at {sub.start} with diff {diff}: {sub.text}')
+            merged.append(sub)
+        for i, sub in enumerate(merged, start=1):
+            sub.index = i
+            sub.text = (sub.text.replace('<i>', '')
+                        .replace('</i>', '')
+                        .replace(r'{\an8}', ''))
+            sub.text = re.sub(r'</?font[^>]*>', '', sub.text)
+        subs = SubRipFile(items=merged)
+        subs.save(srt.with_stem(srt.stem+'_fixed'), encoding="utf-8")
+
+
+@app.command()
+def translate(srt: Path, batch_size: int = 1000):
+    if (key_file := Path(__file__).parent.with_name('key.json')).exists():
+        key_info = json.loads(key_file.read_text())
+    else:
+        key_info = {}
+    if not key_info.get('gemini_api_key'):
+        key_info['gemini_api_key'] = input(
+            'enter geminin api from https://aistudio.google.com/api-keys: ')
+        key_file.write_text(json.dumps(key_info))
+    console.log('View usage at https://aistudio.google.com/usage')
+    gst.gemini_api_key = key_info['gemini_api_key']
+    gst.batch_size = batch_size
+    gst.target_language = "Simplified Chinese"
+    gst.input_file = str(srt)
+    gst.output_file = srt.with_stem(srt.stem+'_translated')
+    gst.translate()
+
+
+@app.command()
 def extract(paths: list[Path]):
     """extract subtitles from video"""
     videos = itertools.chain.from_iterable(
