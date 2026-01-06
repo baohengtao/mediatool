@@ -21,6 +21,71 @@ app = Typer()
 
 
 @app.command()
+def extract(paths: list[Path]):
+    """extract subtitles from video"""
+    videos = itertools.chain.from_iterable(
+        get_video_path(p) for p in paths)
+    for video in videos:
+        get_subtitles(video)
+
+
+def get_subtitles(video: Path):
+    vinfo = get_video_info(video)
+    codec_ext_map = {
+        'subrip': 'srt',
+        'ass': 'ass',
+        'ssa': 'ass',
+        'mov_text': 'srt',
+        'hdmv_pgs_subtitle': 'sup',
+        'dvb_subtitle': 'dvb',
+        'webvtt': 'vtt'
+    }
+    NEED_ALL = False
+    for stream in vinfo['subtitles']:
+        lang_code = stream.get('tags', {}).get('language', 'und')
+        try:
+            lang = iso639.Language.match(lang_code, strict_case=False)
+        except iso639.LanguageNotFoundError as e:
+            continue
+        if lang.name in ['English', 'Chinese']:
+            break
+    else:
+        NEED_ALL = True
+    if len(vinfo['subtitles']) <= 4:
+        NEED_ALL = True
+
+    for stream in vinfo['subtitles']:
+        idx = stream['index']
+        codec = stream['codec_name']
+        ext = codec_ext_map.get(codec, codec)  # fallback to codec name
+        lang_code = stream.get('tags', {}).get('language', 'und')
+        try:
+            lang = iso639.Language.match(lang_code, strict_case=False)
+        except iso639.LanguageNotFoundError as e:
+            console.log(f'{e}:cannot find lang {lang_code}', style='error')
+            lang = None
+        if lang and lang.name not in ['English', 'Chinese', 'Undetermined']:
+            if not NEED_ALL:
+                console.log(f'ignore language: {lang.name}')
+                continue
+        title = stream.get('tags', {}).get('title', '')
+        output_file = video.parent
+        output_file /= f"{video.stem}_{idx}_{lang.name if lang else lang_code}_{title}.{ext}".replace(
+            '__', '_').strip('_')
+        args = {'c:s': 'srt' if codec == 'mov_text' else 'copy'}
+        command = ffmpeg.input(video).output(
+            filename=str(output_file), map=f'0:{idx}', **args)
+        console.log(f'run {command.compile()}')
+        try:
+            command.run()
+        except ffmpeg.Error as e:
+            print(f'ffmpeg Error {e}: '
+                  f'cannot process command {command.compile()}')
+        else:
+            print(f"Extracted {output_file}")
+
+
+@app.command()
 def embed(paths: list[Path]):
     """embed subtitles to video"""
     videos = itertools.chain.from_iterable(
