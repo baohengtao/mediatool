@@ -1,5 +1,6 @@
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import ffmpeg
@@ -8,7 +9,57 @@ from typer import Typer
 
 from mediatool import console
 
+from .chapter import get_chapters_text, write_chapters
+
 app = Typer()
+
+
+@app.command()
+def concat(paths: list[Path]):
+    for path in paths:
+        concat_ts(path)
+
+
+def concat_ts(path: Path) -> Path:
+    if not path.is_dir():
+        return
+    suffixs = ['.mp4', '.ts', '.mkv']
+    videos = [f for f in sorted(path.iterdir())
+              if f.is_file and f.suffix in suffixs]
+    suffix, *_ = list({v.suffix for v in videos})
+    assert not _
+    if suffix == '.ts':
+        suffix = '.mp4'
+    merged = videos[0].with_name(videos[0].stem+'_merged'+suffix)
+    merged = merged.parent.parent / merged.name
+    inc = 0
+    while merged.exists():
+        inc += 1
+        merged = merged.with_stem(f'{merged.stem}_{inc:02d}')
+    text = '\n'.join(f"file '{video.absolute()}'" for video in videos)
+    filelist = path/'filelist.txt'
+    filelist.write_text(text)
+    output = (ffmpeg.input(str(filelist), format='concat', safe=0, fflags='+genpts+discardcorrupt')
+              .output(filename=str(merged), c='copy', avoid_negative_ts='make_zero', map=0))
+    command = output.compile()
+    console.log(f'Running: {command}')
+    process = subprocess.Popen(command, stderr=subprocess.PIPE, text=True)
+    for line in process.stderr:
+        line = line.strip()
+        if 'speed' in line:
+            print(line, end='\r')
+        else:
+            console.log(line, highlight=False)
+
+    if len(videos) > 1:
+        chapters_text = get_chapters_text(videos)
+        tmp = write_chapters(chapters_text, merged)
+        tmp.rename(merged)
+
+    if (xmp_file := path / 'xmp.json').exists():
+        xmp_info = json.loads(xmp_file.read_text())
+        write_xmp(merged, xmp_info)
+    return rename_video(merged)
 
 
 @app.command()

@@ -10,13 +10,14 @@ from awelive.helper import (
     rename_video,
     timestr_to_secs, write_xmp
 )
-from awelive.video import concat_ts
 from pypinyin import lazy_pinyin
 from rich.prompt import Confirm, Prompt
 from send2trash import send2trash
 from typer import Typer
 
 from mediatool import console
+
+from .concat import concat_ts
 
 app = Typer()
 
