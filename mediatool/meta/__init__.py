@@ -1,7 +1,7 @@
 from typer import Typer
 
-from . import chapter, cover, info, subtitle
+from . import chapter, cover, info
 
 app = Typer()
-for app_ in [chapter.app, cover.app, subtitle.app, info.app]:
+for app_ in [chapter.app, cover.app, info.app]:
     app.registered_commands += app_.registered_commands

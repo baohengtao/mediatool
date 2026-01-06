@@ -17,3 +17,4 @@ Home = "https://github.com/baohengtao/mediatool"
 videotool = 'mediatool.video:app'
 audiotool = 'mediatool.audio:app'
 metatool = 'mediatool.meta:app'
+subtitle = 'mediatool.meta.subtitle:app'
