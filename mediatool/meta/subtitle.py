@@ -67,6 +67,61 @@ def translate(srt: Path, batch_size: int = 1000):
 
 
 @app.command()
+def simplify(srt: Path):
+    content = OpenCC('t2s').convert(srt.read_text())
+    dst = srt.with_stem(srt.stem+'_simplifyed')
+    if dst.exists():
+        if Confirm.ask("{dst} already exist, skip?"):
+            return
+    dst.write_text(content)
+
+
+@app.command()
+def dual(upper_srt: Path, down_srt: Path):
+    ch_subs = SubRipFile.open(upper_srt)
+    en_subs = SubRipFile.open(down_srt)
+    merged_subs = SubRipFile()
+
+    i = j = 0
+    while i < len(ch_subs) and j < len(en_subs):
+        ch_item = ch_subs[i]
+        en_item = en_subs[j]
+
+        # 判断时间是否重叠
+        if ch_item.end < en_item.start:
+            # 中文在前，英文还没到
+            merged_subs.append(ch_item)
+            i += 1
+        elif en_item.end < ch_item.start:
+            # 英文在前，中文还没到
+            merged_subs.append(en_item)
+            j += 1
+        else:
+            # 有时间重叠，合并
+            start = min(ch_item.start, en_item.start)
+            end = max(ch_item.end, en_item.end)
+            text = f"{ch_item.text}\n{en_item.text}"
+            merged_subs.append(SubRipItem(
+                index=len(merged_subs)+1, start=start, end=end, text=text))
+            i += 1
+            j += 1
+
+    # 把剩下的字幕加上
+    for k in range(i, len(ch_subs)):
+        merged_subs.append(ch_subs[k])
+    for k in range(j, len(en_subs)):
+        merged_subs.append(en_subs[k])
+
+    output_file = upper_srt.with_stem(upper_srt.stem+'_merged')
+    if output_file.exists():
+        if not Confirm.ask(f'{output_file} exist, overwrite?'):
+            console.log(f'abort process...')
+            return
+    merged_subs.clean_indexes()
+    merged_subs.save(output_file, encoding='utf-8')
+
+
+@app.command()
 def extract(paths: list[Path]):
     """extract subtitles from video"""
     videos = itertools.chain.from_iterable(
