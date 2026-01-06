@@ -189,3 +189,83 @@ def merge_srt_folder(folder: Path):
     # Write merged SRT
     output_srt.write_text(srt.compose(all_subs), encoding="utf-8")
     print(f"Merged {len(srt_files)} files into {output_srt}")
+
+
+@app.command()
+def lrc2srt(paths: list[Path]):
+    for path in paths:
+        lrc2srt_single(path)
+
+
+def lrc2srt_single(lrc_path: Path):
+    if lrc_path.suffix != '.lrc':
+        return
+    subs_list = []
+    meta = {}
+    for line in lrc_path.read_text().split('\n'):
+        line = line.strip()
+
+        for key in ['ti', 'al', 'ar']:
+            if match := re.match(rf'\[{key}:(.+)\]', line, re.I):
+                assert meta.get(key) is None
+                meta[key] = match.group(1).strip()
+        if not line or re.match(r'\[[a-z]{2,}:.+\]', line, re.I):
+            continue
+        if not (start_match := re.match(r'^\[(\d+):(\d+\.\d+)\]', line)):
+            continue
+        start_min, start_sec = start_match.groups()
+        start_ms = time_to_ms(start_min, start_sec)
+        end_match = re.search(r'(\d+):(\d+\.\d+)\]$', line)
+        if end_match:
+            end_min, end_sec = end_match.groups()
+            end_ms = time_to_ms(end_min, end_sec)
+        else:
+            end_ms = 0
+        text = re.sub(r'\[\d+:\d+\.\d+\]', '', line).strip()
+        subs_list.append((start_ms, end_ms, text))
+    subs_dict = defaultdict(list)
+    for start_ms, end_ms, text in subs_list:
+        subs_dict[start_ms].append((text, end_ms))
+    timestamps = sorted(subs_dict.keys())
+
+    srt_blocks = []
+    if subs_list and meta:
+        text = ' | '.join([meta[k] for k in ['ar', 'al', 'ti']])
+        first_start_ms = subs_list[0][0]
+        srt_block = f"1\n00:00:00,000 --> {ms_to_srt(first_start_ms)}\n{text}\n"
+        srt_blocks.append(srt_block)
+
+    for idx, start_ms in enumerate(timestamps, 1):
+        text, end_ms_ = zip(*subs_dict[start_ms])
+        text, end_ms = list(text), max(end_ms_)
+        if text[0]:
+            text[0] = f'♪ {text[0]} ♪'
+        else:
+            text = text[1:]
+        text = "\n".join(text)
+        if not end_ms:
+            assert idx == len(timestamps)
+            end_ms = start_ms + 2000  # add 2s for last lyric
+        start_srt = ms_to_srt(start_ms)
+        end_srt = ms_to_srt(end_ms)
+        block = f"{idx}\n{start_srt} --> {end_srt}\n{text}\n"
+        srt_blocks.append(block)
+    if (srt := lrc_path.with_suffix('.srt')).exists():
+        if not Confirm.ask(f'{srt} already exist, overwrite?'):
+            console.log(f'skip {lrc_path} since srt already exist!')
+            return
+    srt.write_text('\n'.join(srt_blocks))
+
+
+def time_to_ms(minute, second):
+    return int(minute) * 60_000 + int(float(second) * 1000)
+
+
+def ms_to_srt(ms):
+    h = ms // 3600000
+    ms %= 3600000
+    m = ms // 60000
+    ms %= 60000
+    s = ms // 1000
+    ms %= 1000
+    return f"{h:02}:{m:02}:{s:02},{ms:03}"
