@@ -1,6 +1,12 @@
+"""
+Edit video using ffmpeg
+"""
 from rich.console import Console
 from rich.theme import Theme
 from rich.traceback import install
+
+__version__ = '2025.1.6'
+
 
 custom_theme = Theme({
     "info": "dim cyan",
