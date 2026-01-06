@@ -7,7 +7,6 @@ import ffmpeg
 from awelive.helper import (
     copy_meta, get_video_info,
     get_video_path, get_xmp,
-    logsaver_decorator,
     rename_video, write_xmp
 )
 from rich.prompt import Prompt
@@ -24,7 +23,6 @@ app = Typer()
 
 
 @app.command()
-@logsaver_decorator
 def get_loudness(paths: list[Path]):
     videos = itertools.chain.from_iterable(
         get_video_path(p) for p in sorted(paths))
@@ -84,7 +82,6 @@ def get_loudness_stats(input_filepath: Path) -> dict:
 
 
 @app.command()
-@logsaver_decorator
 def normalize(path: Path, target_i: float = None, tp: float = None,
               lra: float = None, dynamic: bool = False):
 
