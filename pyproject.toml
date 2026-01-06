@@ -11,3 +11,7 @@ dynamic = ["version", "description"]
 
 [project.urls]
 Home = "https://github.com/baohengtao/mediatool"
+
+
+[project.scripts]
+videotool = 'mediatool.video:app'
