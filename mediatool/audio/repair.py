@@ -2,7 +2,6 @@ import itertools
 from pathlib import Path
 
 import ffmpeg
-from awelive import console
 from awelive.helper import (
     copy_meta, get_video_info,
     get_video_path, get_xmp,
@@ -10,6 +9,8 @@ from awelive.helper import (
 )
 from rich.prompt import Confirm
 from typer import Typer
+
+from mediatool import console
 
 app = Typer()
 

@@ -7,7 +7,7 @@ from awelive.helper import get_video_path, get_xmp
 from mutagen.mp4 import MP4, MP4Cover
 from typer import Typer
 
-from mediatool import console
+from mediatool import DATA_PATH, console
 
 app = Typer()
 
@@ -27,7 +27,7 @@ def write_id3(m4a_file, meta: dict[str, str]):
     audio['©ART'] = meta['XMP:Artist']
     audio['©gen'] = '戏曲'
 
-    image_data = Path(__file__).with_name('artwork.jpg').read_bytes()
+    image_data = DATA_PATH.with_name('artwork.jpg').read_bytes()
     cover = MP4Cover(image_data, imageformat=MP4Cover.FORMAT_JPEG)
     audio.tags['covr'] = [cover]
     audio.tags['aART'] = '婺剧Live'

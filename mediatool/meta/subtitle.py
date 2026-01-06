@@ -10,12 +10,13 @@ import gemini_srt_translator as gst
 import iso639
 import questionary
 import srt
-from awelive import console
 from awelive.helper import get_video_info, get_video_path
 from opencc import OpenCC
 from pysrt import SubRipFile, SubRipItem
 from rich.prompt import Confirm, Prompt
 from typer import Typer
+
+from mediatool import DATA_PATH, console
 
 app = Typer()
 
@@ -49,7 +50,7 @@ def fix_srt(paths: list[Path]):
 
 @app.command()
 def translate(srt: Path, batch_size: int = 1000):
-    if (key_file := Path(__file__).parent.with_name('key.json')).exists():
+    if (key_file := DATA_PATH/'key.json').exists():
         key_info = json.loads(key_file.read_text())
     else:
         key_info = {}
