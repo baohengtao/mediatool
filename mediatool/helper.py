@@ -1,10 +1,13 @@
 
 import asyncio
+import fractions
 import time
+from collections import defaultdict
 from functools import wraps
 from pathlib import Path
 from typing import Iterator
 
+import ffmpeg
 from exiftool import ExifToolHelper
 
 from mediatool import console
@@ -86,3 +89,74 @@ def get_video_path(path: Path) -> Iterator[Path]:
             yield from get_video_path(p)
 
     yield from sorted(files)
+
+
+def get_video_info(video_path):
+    info = ffmpeg.probe(video_path, show_chapters=None)
+    streams = defaultdict(list)
+    for s in info['streams']:
+        if s['codec_name'] in ['mjpeg', 'png']:
+            assert s['codec_type'] == 'video'
+            streams['cover'].append(s)
+        else:
+            streams[s['codec_type']].append(s)
+
+    audio_info, *_ = streams.pop('audio', [None])
+    assert not _
+    video_info, *_ = streams.pop('video', [None,])
+    assert not _
+    has_cover, *_ = streams.pop('cover', [None,])
+    assert not _
+    streams.pop('data', None)
+    subtitles = streams.pop('subtitle', None)
+    assert not streams
+    if not video_info:
+        assert audio_info
+        return {'is_audio': True} | audio_info
+    fps = video_info['avg_frame_rate']
+    vinfo = dict(
+        codec=video_info['codec_name'],
+        bit_rate_num=(x := int(video_info.get('bit_rate', 0))),
+        bit_rate=f"{x/1000_000:.1f}M",
+        chapters=info['chapters'],
+        fps=round(fractions.Fraction(fps) if fps != '0/0' else 0),
+        channels=int(audio_info['channels']),
+        duration=float(info['format']['duration']),
+        has_cover=bool(has_cover),
+        timebase=video_info['time_base'],
+        subtitles=subtitles
+    )
+    _codec = ['h264', 'hevc', 'vp9', 'av1', 'mpeg2video']
+    assert vinfo['codec'] in _codec, vinfo['codec']
+    vinfo['height'], vinfo['width'] = sorted(
+        (video_info['height'], video_info['width']))
+
+    suffix = [vinfo['bit_rate']]
+    chapters = vinfo['chapters']
+    if (chp_cnt := len(chapters)) > 1:
+        if vinfo['duration'] < float(chapters[-1]['start_time']):
+            console.log(
+                f"seems redundant chapters for {video_path}", style='error')
+        suffix.append(f'{chp_cnt}chpt')
+    if (w := vinfo['height']) != 1080:
+        suffix.append(f'{w}p')
+    if (fps := vinfo['fps']) > 30:
+        suffix.append(f'{fps}fps')
+    assert vinfo['channels'] in [1, 2, 5, 6]
+    if vinfo['channels'] == 1:
+        suffix.append('mono')
+    if vinfo['codec'] != 'h264':
+        suffix.append(vinfo['codec'])
+    if has_cover:
+        suffix.append('covered')
+
+    vinfo['suffix'] = suffix
+    vinfo |= dict(audio=audio_info, video=video_info)
+    return vinfo
+
+
+def secs_to_timestr(seconds: float) -> str:
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = seconds % 60
+    return f"{h:02}:{m:02}:{s:06.3f}"
