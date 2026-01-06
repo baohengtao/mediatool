@@ -134,3 +134,58 @@ def add_subtitles(video: Path):
     command += [str(dst)]
     print(' '.join(command))
     subprocess.run(command, check=True)
+
+
+@app.command()
+def shift(paths: list[Path]):
+    for path in paths:
+        shift_srt(path)
+
+
+def shift_srt(input_srt: Path):
+    offset = Prompt.ask(f'enter the time to shift {input_srt}')
+    if not offset:
+        return
+    stem = '_'.join([input_srt.stem, offset])
+    (ffmpeg .input(str(input_srt), itsoffset=offset)
+     .output(filename=str(input_srt.with_stem(stem)), c='copy').run())
+
+
+@app.command()
+def merge(path: Path):
+    merge_srt_folder(path)
+
+
+def merge_srt_folder(folder: Path):
+    """
+    Merge all SRT files directly under the given folder into 'merged.srt'.
+    Skips nested folders. If 'merged.srt' already exists, does nothing.
+    """
+    output_srt = folder / "merged.srt"
+    if output_srt.exists():
+        print(f"{output_srt} already exists, skipping merge.")
+        return
+
+    # List all .srt files directly under folder, sorted by name
+    srt_files = sorted([f for f in folder.iterdir()
+                       if f.is_file() and f.suffix.lower() == ".srt"])
+    if not srt_files:
+        print("No SRT files found in folder.")
+        return
+
+    all_subs = []
+    for file in srt_files:
+        content = file.read_text(encoding="utf-8")
+        subs = list(srt.parse(content))
+        all_subs.extend(subs)
+
+    # Sort by start time
+    all_subs.sort(key=lambda x: x.start)
+
+    # Renumber sequentially
+    for i, sub in enumerate(all_subs, start=1):
+        sub.index = i
+
+    # Write merged SRT
+    output_srt.write_text(srt.compose(all_subs), encoding="utf-8")
+    print(f"Merged {len(srt_files)} files into {output_srt}")
