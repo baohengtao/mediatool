@@ -3,9 +3,9 @@ import json
 from pathlib import Path
 
 import ffmpeg
-from awelive import console
 from typer import Typer
 
+from mediatool import console
 from mediatool.helper import (
     get_video_path, get_xmp,
     rename_video,

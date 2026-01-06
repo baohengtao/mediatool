@@ -10,14 +10,13 @@ import gemini_srt_translator as gst
 import iso639
 import questionary
 import srt
-from awelive.helper import get_video_info
 from opencc import OpenCC
 from pysrt import SubRipFile, SubRipItem
 from rich.prompt import Confirm, Prompt
 from typer import Typer
 
 from mediatool import DATA_PATH, console
-from mediatool.helper import get_video_path
+from mediatool.helper import get_video_info, get_video_path
 
 app = Typer()
 

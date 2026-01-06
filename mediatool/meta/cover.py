@@ -4,16 +4,15 @@ from pathlib import Path
 
 import ffmpeg
 import requests
-from awelive.helper import (
-    copy_meta, get_video_info,
-    get_video_path, get_xmp,
-    write_xmp
-)
 from rich.prompt import Prompt
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import run_async
+from mediatool.helper import (
+    copy_meta, get_video_info,
+    get_video_path, get_xmp,
+    run_async, write_xmp
+)
 
 app = Typer()
 

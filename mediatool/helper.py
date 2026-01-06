@@ -10,8 +10,6 @@ from typing import Iterator
 
 import ffmpeg
 import pendulum
-from awelive import console
-from awelive.helper import get_video_info, get_xmp
 from exiftool import ExifToolHelper
 from rich.prompt import Confirm, Prompt
 
