@@ -242,5 +242,6 @@ def apply_loudness_normalization(input_filepath: Path, output_filepath: Path,
         else:
             highlight = '"' in line
             console.log(line, highlight=highlight)
-
+    if not output_filepath.exists():
+        raise ValueError(f'normalize {input_filepath} failed!')
     copy_meta(input_filepath, output_filepath)
