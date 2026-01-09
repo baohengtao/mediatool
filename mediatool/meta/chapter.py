@@ -9,7 +9,8 @@ from typer import Typer
 
 from mediatool import console
 from mediatool.helper import (
-    copy_meta, get_stream_info, get_video_info,
+    copy_meta,
+    get_stream_info,
     get_video_path,
     rename_video
 )
@@ -135,10 +136,10 @@ def fix_chapter(paths: list[Path]):
 
 
 def fix_chapter_single(video_path: Path):
-    vinfo = get_video_info(video_path)
-    chapters = vinfo['chapters']
+    vinfo = get_stream_info(video_path)
+    chapters, duration = vinfo['chapters'],  vinfo['format']['duration']
     flag = False
-    while chapters and float(chapters[-1]['start_time']) > vinfo['duration']:
+    while chapters and float(chapters[-1]['start_time']) > duration:
         chapters.pop()
         flag = True
     if flag:

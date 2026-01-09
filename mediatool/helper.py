@@ -164,7 +164,7 @@ def get_video_path(path: Path) -> Iterator[Path]:
 def get_stream_info(video_path):
     info = ffmpeg.probe(video_path, show_chapters=None)
     streams = defaultdict(list)
-    for s in info['streams']:
+    for s in info.pop('streams'):
         if s['codec_name'] in ['mjpeg', 'png']:
             assert s['codec_type'] == 'video'
             streams['cover'].append(s)
@@ -172,6 +172,8 @@ def get_stream_info(video_path):
             streams[s['codec_type']].append(s)
     assert set(streams).issubset({'audio', 'video', 'cover', 'subtitle','data'}), set(streams)
     streams['chapters'] = info.pop('chapters')
+    streams['format'] = info.pop('format')
+    assert not info
     return dict(streams.items())
 
 def get_video_info(video_path):
