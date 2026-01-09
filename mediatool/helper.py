@@ -161,6 +161,7 @@ def get_video_path(path: Path) -> Iterator[Path]:
 
     yield from sorted(files)
 
+
 def get_stream_info(video_path):
     info = ffmpeg.probe(video_path, show_chapters=None)
     streams = defaultdict(list)
@@ -170,11 +171,14 @@ def get_stream_info(video_path):
             streams['cover'].append(s)
         else:
             streams[s['codec_type']].append(s)
-    assert set(streams).issubset({'audio', 'video', 'cover', 'subtitle','data'}), set(streams)
+    assert set(streams).issubset(
+        {'audio', 'video', 'cover', 'subtitle', 'data'}), set(streams)
     streams['chapters'] = info.pop('chapters')
     streams['format'] = info.pop('format')
     assert not info
-    return dict(streams.items())
+    streams = dict(streams.items())
+    return streams
+
 
 def get_video_info(video_path):
     info = ffmpeg.probe(video_path, show_chapters=None)
@@ -193,7 +197,7 @@ def get_video_info(video_path):
     has_cover, *_ = streams.pop('cover', [None,])
     assert not _
     streams.pop('data', None)
-    subtitles = streams.pop('subtitle', None)
+    streams.pop('subtitle', None)
     assert not streams
     if not video_info:
         assert audio_info
@@ -208,8 +212,6 @@ def get_video_info(video_path):
         channels=int(audio_info['channels']),
         duration=float(info['format']['duration']),
         has_cover=bool(has_cover),
-        timebase=video_info['time_base'],
-        subtitles=subtitles
     )
     _codec = ['h264', 'hevc', 'vp9', 'av1', 'mpeg2video']
     assert vinfo['codec'] in _codec, vinfo['codec']
