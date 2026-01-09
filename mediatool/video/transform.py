@@ -10,7 +10,7 @@ from rich.prompt import Confirm, Prompt
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import copy_meta, get_video_info, get_video_path
+from mediatool.helper import copy_meta, get_stream_info, get_video_path
 
 app = Typer()
 
@@ -24,8 +24,9 @@ def to_h264(paths: list[Path]):
 
 
 def convert_to_h264(video: Path):
-    vinfo = get_video_info(video)
-    if (codec := vinfo['codec']) == 'h264':
+    vstream,*_ = get_stream_info(video)['video']
+    assert not _
+    if (codec := vstream['codec_name']) == 'h264':
         return
     console.log(f'{video}: convert {codec} to h264')
     new_video = video.with_stem(video.stem+'_avc')
@@ -34,7 +35,6 @@ def convert_to_h264(video: Path):
         return
     args = {'c:a': 'copy', 'c:v': 'libx264',
             'preset': 'slow',
-            # 'b:v': vinfo['bit_rate_num']*1.5,
             'crf': '18',
             'video_track_timescale': 90000}
     (ffmpeg.input(filename=str(video), fflags='+genpts+discardcorrupt', noautorotate=None)

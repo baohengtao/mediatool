@@ -9,7 +9,7 @@ from typer import Typer
 
 from mediatool import console
 from mediatool.helper import (
-    copy_meta, get_video_info,
+    copy_meta, get_stream_info,
     get_video_path, get_xmp,
     run_async, write_xmp
 )
@@ -55,7 +55,7 @@ async def get_cover_image(input: Path):
 
 
 async def write_cover(input: Path):
-    if get_video_info(input)['has_cover']:
+    if get_stream_info(input).get('cover'):
         console.log(f'{input.name}: already write cover, skip...')
         return
     output = input.with_stem(input.stem+'_covered')

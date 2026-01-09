@@ -9,7 +9,7 @@ from typer import Typer
 
 from mediatool import console
 from mediatool.helper import (
-    copy_meta, get_video_info,
+    copy_meta, get_stream_info,
     get_video_path, get_xmp,
     rename_video,
     timestr_to_secs, write_xmp
@@ -192,7 +192,6 @@ def normalize_volume_partial(video_path: Path, linear: bool):
 def apply_loudness_normalization(input_filepath: Path, output_filepath: Path,
                                  measured_stats, target_i, tp=None, lra=None,
                                  linear=True):
-    audio_only = get_video_info(input_filepath).get('is_audio')
     input_stream = ffmpeg.input(str(input_filepath))
     audio_input_stream = input_stream.audio
     video_input_stream = input_stream.video
@@ -215,7 +214,7 @@ def apply_loudness_normalization(input_filepath: Path, output_filepath: Path,
         print_format='json'
     )
 
-    if audio_only:
+    if not get_stream_info(input_filepath).get('video'):
         command = ffmpeg.output(
             audio_normalized_stream,
             filename=str(output_filepath),

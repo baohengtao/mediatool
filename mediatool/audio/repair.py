@@ -7,7 +7,7 @@ from typer import Typer
 
 from mediatool import console
 from mediatool.helper import (
-    copy_meta, get_video_info,
+    copy_meta, get_stream_info,
     get_video_path, get_xmp,
     write_xmp
 )
@@ -106,8 +106,9 @@ def mono_audio(paths: list[Path]):
 
 
 def convert_audio_to_mono(filepath: Path):
-    vinfo = get_video_info(filepath)
-    if vinfo['channels'] == 1:
+    audio_info, *_ = get_stream_info(filepath)['audio']
+    assert not _
+    if audio_info['channels'] == 1:
         console.log(f'{filepath} is already mono')
         return
     dst = filepath.with_stem(filepath.stem+'_mono')

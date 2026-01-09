@@ -9,7 +9,7 @@ from typer import Typer
 
 from mediatool import console
 from mediatool.helper import (
-    copy_meta, get_video_info,
+    copy_meta, get_stream_info, get_video_info,
     get_video_path,
     rename_video
 )
@@ -113,7 +113,7 @@ def singlify_chapter(paths: list[Path]):
 
 
 def singlify_chapter_single(video_path: Path):
-    vinfo = get_video_info(video_path)
+    vinfo = get_stream_info(video_path)
     if len(vinfo['chapters']) <= 1:
         return
     chapters_list = [{

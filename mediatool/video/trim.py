@@ -11,7 +11,7 @@ from typer import Typer
 
 from mediatool import console
 from mediatool.helper import (
-    get_video_info,
+    get_stream_info,
     get_video_path, get_xmp,
     rename_video,
     timestr_to_secs, write_xmp
@@ -157,7 +157,6 @@ def trim_video_segments(video_path: Path):
 
 def run_split_command(input_file: Path, output_file: Path, ss: str = None, to: str = None):
     assert ss or to
-    vinfo = get_video_info(input_file)
     command = ['ffmpeg']
     if ss is not None:
         command += ['-ss', str(ss)]
@@ -165,7 +164,7 @@ def run_split_command(input_file: Path, output_file: Path, ss: str = None, to: s
         command += ['-to', str(to)]
     command += ['-i', str(input_file)]
     command += ['-map', '0:v', '-map', '0:a']
-    if vinfo.get('subtitles'):
+    if  get_stream_info(input_file).get('subtitles'):
         command += ['-map', '0:s']
     command += ['-c', 'copy', '-avoid_negative_ts',
                 'make_zero', str(output_file)]

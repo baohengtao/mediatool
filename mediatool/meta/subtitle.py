@@ -16,7 +16,7 @@ from rich.prompt import Confirm, Prompt
 from typer import Typer
 
 from mediatool import DATA_PATH, console
-from mediatool.helper import get_video_info, get_video_path
+from mediatool.helper import get_stream_info, get_video_path
 
 app = Typer()
 
@@ -132,7 +132,7 @@ def extract(paths: list[Path]):
 
 
 def get_subtitles(video: Path):
-    vinfo = get_video_info(video)
+    subtitles = get_stream_info(video)['subtitles']
     codec_ext_map = {
         'subrip': 'srt',
         'ass': 'ass',
@@ -143,8 +143,8 @@ def get_subtitles(video: Path):
         'webvtt': 'vtt'
     }
     NEED_ALL = False
-    for stream in vinfo['subtitles']:
-        lang_code = stream.get('tags', {}).get('language', 'und')
+    for subtitle in subtitles:
+        lang_code = subtitle.get('tags', {}).get('language', 'und')
         try:
             lang = iso639.Language.match(lang_code, strict_case=False)
         except iso639.LanguageNotFoundError as e:
@@ -153,14 +153,14 @@ def get_subtitles(video: Path):
             break
     else:
         NEED_ALL = True
-    if len(vinfo['subtitles']) <= 4:
+    if len(subtitles) <= 4:
         NEED_ALL = True
 
-    for stream in vinfo['subtitles']:
-        idx = stream['index']
-        codec = stream['codec_name']
+    for subtitle in subtitles:
+        idx = subtitle['index']
+        codec = subtitle['codec_name']
         ext = codec_ext_map.get(codec, codec)  # fallback to codec name
-        lang_code = stream.get('tags', {}).get('language', 'und')
+        lang_code = subtitle.get('tags', {}).get('language', 'und')
         try:
             lang = iso639.Language.match(lang_code, strict_case=False)
         except iso639.LanguageNotFoundError as e:
@@ -170,7 +170,7 @@ def get_subtitles(video: Path):
             if not NEED_ALL:
                 console.log(f'ignore language: {lang.name}')
                 continue
-        title = stream.get('tags', {}).get('title', '')
+        title = subtitle.get('tags', {}).get('title', '')
         output_file = video.parent
         output_file /= f"{video.stem}_{idx}_{lang.name if lang else lang_code}_{title}.{ext}".replace(
             '__', '_').strip('_')
