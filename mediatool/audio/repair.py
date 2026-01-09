@@ -6,11 +6,7 @@ from rich.prompt import Confirm
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import (
-    copy_meta, get_stream_info,
-    get_video_path, get_xmp,
-    write_xmp
-)
+from mediatool.helper import copy_meta, get_stream_info, get_video_path
 
 app = Typer()
 
@@ -114,7 +110,7 @@ def convert_audio_to_mono(filepath: Path):
     dst = filepath.with_stem(filepath.stem+'_mono')
     if dst.exists():
         assert dst.is_file()
-        if not Confirm.ask(f'{dst} exsit, overwrite?'):
+        if not Confirm.ask(f'{dst} exist, overwrite?'):
             return
     console.log(f'fixing {filepath}')
     command = ffmpeg.input(filename=filepath).output(
@@ -127,7 +123,5 @@ def convert_audio_to_mono(filepath: Path):
     )
     console.log(command.compile())
     command.run()
-    if tags := get_xmp(filepath):
-        write_xmp(dst, tags)
-
+    copy_meta(filepath, dst)
     console.log(f'saved to {dst}')

@@ -23,10 +23,10 @@ def get_xmp(img: Path, with_sound: bool = False):
         return {}
     meta = et.get_metadata(img)[0]
     xmp = {k: v for k, v in meta.items() if k.startswith('XMP:')
-           and k != 'XMP:XMPToolkit'}
+           and k not in ['XMP:XMPToolkit', 'XMP:Volume']}
     if with_sound:
-        k = 'QuickTime:Information'
-        xmp[k] = meta.get(k)
+        xmp |= {k: v for k, v in meta.items() if k in [
+            'XMP:Volume', 'QuickTime:Information']}
     return xmp
 
 
@@ -45,17 +45,12 @@ def write_xmp(img: Path, tags: dict):
 
 
 def copy_meta(src: Path, dst: Path, with_sound=False):
-    meta = et.get_metadata(src)[0]
-    xmp = {k: v for k, v in meta.items() if k.startswith('XMP:')
-           and k not in ['XMP:XMPToolkit', 'XMP:Volume']}
-    if with_sound:
-        xmp |= {k: v for k, v in meta.items() if k in [
-            'XMP:Volume', 'QuickTime:Information']}
+    xmp = get_xmp(src, with_sound)
     write_xmp(dst, xmp)
 
 
 def rename_video(video: Path, fix=False, change_artist=False, change_title=False) -> Path:
-    meta = get_xmp(video)
+    meta = get_xmp(video, with_sound=True)
     created_at = meta.get('XMP:DateCreated')
     title = meta.get('XMP:Title', '')
     artist = meta.get('XMP:Artist', '')
