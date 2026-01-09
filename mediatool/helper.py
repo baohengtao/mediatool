@@ -177,40 +177,29 @@ def get_stream_info(video_path):
     streams['format'] = info.pop('format')
     assert not info
     streams = dict(streams.items())
+    for k in ['video', 'audio']:
+        if (x := len(streams[k])) > 1:
+            console.log(f'{x} {k} streams found', style='error')
     return streams
 
 
 def get_video_info(video_path):
-    info = ffmpeg.probe(video_path, show_chapters=None)
-    streams = defaultdict(list)
-    for s in info['streams']:
-        if s['codec_name'] in ['mjpeg', 'png']:
-            assert s['codec_type'] == 'video'
-            streams['cover'].append(s)
-        else:
-            streams[s['codec_type']].append(s)
-
+    streams = get_stream_info(video_path)
     audio_info, *_ = streams.pop('audio', [None])
     assert not _
     video_info, *_ = streams.pop('video', [None,])
     assert not _
     has_cover, *_ = streams.pop('cover', [None,])
     assert not _
-    streams.pop('data', None)
-    streams.pop('subtitle', None)
-    assert not streams
-    if not video_info:
-        assert audio_info
-        return {'is_audio': True} | audio_info
     fps = video_info['avg_frame_rate']
     vinfo = dict(
         codec=video_info['codec_name'],
         bit_rate_num=(x := int(video_info.get('bit_rate', 0))),
         bit_rate=f"{x/1000_000:.1f}M",
-        chapters=info['chapters'],
+        chapters=streams['chapters'],
         fps=round(fractions.Fraction(fps) if fps != '0/0' else 0),
         channels=int(audio_info['channels']),
-        duration=float(info['format']['duration']),
+        duration=float(streams['format']['duration']),
         has_cover=bool(has_cover),
     )
     _codec = ['h264', 'hevc', 'vp9', 'av1', 'mpeg2video']
