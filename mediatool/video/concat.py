@@ -7,7 +7,11 @@ import ffmpeg
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import copy_meta, get_video_info, rename_video, write_xmp
+from mediatool.helper import (
+    copy_meta,
+    get_stream_info,
+    rename_video, write_xmp
+)
 from mediatool.meta.chapter import get_chapters_text, write_chapters
 
 app = Typer()
@@ -91,7 +95,9 @@ def fix_ts_single(path: Path, to_ts: bool = False, flac: bool = False):
         if video.suffix in ['.mp4', '.ts', '.mov', '.mkv', '.webm']:
             suf = '.ts' if to_ts else '.mp4'
             try:
-                codec = get_video_info(video)['codec']
+                video_info, *_ = get_stream_info(video)['video']
+                assert not _
+                codec = video_info['codec_name']
             except Exception as e:
                 console.log(f'error {e}, skip....')
                 shutil.copy2(video, new_path/('error_'+video.name))
