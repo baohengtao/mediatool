@@ -87,7 +87,7 @@ def rename_video(video: Path, fix=False, change_artist=False, change_title=False
     if created_at:
         created_at = pendulum.from_format(created_at, 'YYYY:MM:DD HH:mm:ss')
     try:
-        vinfo = get_video_info(video)
+        vinfo = get_stream_info(video)['vinfo']
     except ValueError:
         suffix = '_error_get_vinfo'
     else:
@@ -180,16 +180,17 @@ def get_stream_info(video_path):
     for k in ['video', 'audio']:
         if (x := len(streams[k])) > 1:
             console.log(f'{x} {k} streams found', style='error')
+            return streams
+    streams['vinfo'] = parse_stream(streams)
     return streams
 
 
-def get_video_info(video_path):
-    streams = get_stream_info(video_path)
-    audio_info, *_ = streams.pop('audio', [None])
+def parse_stream(streams):
+    audio_info, *_ = streams.get('audio', [None])
     assert not _
-    video_info, *_ = streams.pop('video', [None,])
+    video_info, *_ = streams.get('video', [None,])
     assert not _
-    has_cover, *_ = streams.pop('cover', [None,])
+    has_cover, *_ = streams.get('cover', [None,])
     assert not _
     fps = video_info['avg_frame_rate']
     vinfo = dict(
