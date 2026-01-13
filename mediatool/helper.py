@@ -208,7 +208,8 @@ def parse_stream(streams):
     if (chp_cnt := len(chapters)) > 1:
         if vinfo['duration'] < float(chapters[-1]['start_time']):
             console.log(
-                f"seems redundant chapters for {video_path}", style='error')
+                f"seems redundant chapters for {streams['format']['filename']}",
+                style='error')
         suffix.append(f'{chp_cnt}chpt')
     if (w := vinfo['height']) != 1080:
         suffix.append(f'{w}p')

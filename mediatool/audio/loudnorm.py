@@ -9,7 +9,8 @@ from typer import Typer
 
 from mediatool import console
 from mediatool.helper import (
-    copy_meta, get_stream_info,
+    copy_meta,
+    get_stream_info,
     get_video_path, get_xmp,
     rename_video,
     timestr_to_secs, write_xmp
@@ -22,8 +23,18 @@ TARGET_TP = -2.0
 app = Typer()
 
 
+def check_normalized(filepath: Path) -> bool:
+    meta = get_xmp(filepath, with_sound=True)
+    if stats := meta.get('QuickTime:Information'):
+        stats = json.loads(stats)
+        volume = float(stats['input_i'])
+        if float(stats['input_tp']) < 0 and -16.5 < volume < -15:
+            return True
+    return False
+
+
 @app.command()
-def get_loudness(paths: list[Path]):
+def loudness(paths: list[Path]):
     videos = itertools.chain.from_iterable(
         get_video_path(p) for p in sorted(paths))
     for video in videos:
