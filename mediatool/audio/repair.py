@@ -94,7 +94,7 @@ def shift_audio(input_path: Path, offset: float):
 
 
 @app.command()
-def mono_audio(paths: list[Path]):
+def mono(paths: list[Path]):
     videos = itertools.chain.from_iterable(
         get_video_path(p) for p in paths)
     for video in videos:
@@ -113,8 +113,8 @@ def convert_audio_to_mono(filepath: Path):
         if not Confirm.ask(f'{dst} exist, overwrite?'):
             return
     console.log(f'fixing {filepath}')
-    command = ffmpeg.input(filename=filepath).output(
-        filename=dst,
+    command = ffmpeg.input(filename=str(filepath)).output(
+        filename=str(dst),
         vcodec='copy',
         acodec='flac',
         ar='48000',
@@ -122,6 +122,34 @@ def convert_audio_to_mono(filepath: Path):
         ac=1
     )
     console.log(command.compile())
+    command.run()
+    copy_meta(filepath, dst)
+    console.log(f'saved to {dst}')
+
+
+@app.command()
+def fix_phase(paths: list[Path]):
+    videos = itertools.chain.from_iterable(
+        get_video_path(p) for p in paths)
+    for video in videos:
+        fix_audio_phase(video)
+
+
+def fix_audio_phase(filepath: Path):
+    dst = filepath.with_stem(filepath.stem+'_phased')
+    if dst.exists():
+        assert dst.is_file()
+        if not Confirm.ask(f'{dst} exist. overwrite?'):
+            return
+    console.log(f'fixing {filepath}')
+    command = ffmpeg.input(str(filepath)).output(
+        filename=str(dst),
+        vcodec='copy',
+        acodec="flac",
+        ar='48000',
+        sample_fmt='s32',
+        af="pan=stereo|c0=c0|c1=-1*c1")
+    console.log(f'running {" ".join(command.compile())}')
     command.run()
     copy_meta(filepath, dst)
     console.log(f'saved to {dst}')
