@@ -8,6 +8,8 @@ authors = [{name = "BaoHengtao", email = "baohengtao@users.noreply.github.com"}]
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
 dynamic = ["version", "description"]
+dependencies=['ffmpeg-python', 'mutagen']
+
 
 [project.urls]
 Home = "https://github.com/baohengtao/mediatool"
