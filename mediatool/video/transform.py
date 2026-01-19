@@ -24,7 +24,7 @@ def to_h264(paths: list[Path]):
 
 
 def convert_to_h264(video: Path):
-    vstream,*_ = get_stream_info(video)['video']
+    vstream, *_ = get_stream_info(video)['video']
     assert not _
     if (codec := vstream['codec_name']) == 'h264':
         return
@@ -38,7 +38,7 @@ def convert_to_h264(video: Path):
             'crf': '18',
             'video_track_timescale': 90000}
     (ffmpeg.input(filename=str(video), fflags='+genpts+discardcorrupt', noautorotate=None)
-     .output(filename=str(new_video), avoid_negative_ts='make_zero', map=0, **args)
+     .output(filename=str(new_video), map=0, **args)
      .run(overwrite_output=False))
 
 

@@ -43,7 +43,7 @@ def concat_ts(path: Path) -> Path:
     filelist = path/'filelist.txt'
     filelist.write_text(text)
     output = (ffmpeg.input(str(filelist), format='concat', safe=0, fflags='+genpts+discardcorrupt')
-              .output(filename=str(merged), c='copy', avoid_negative_ts='make_zero', map=0))
+              .output(filename=str(merged), c='copy', map=0))
     command = output.compile()
     console.log(f'Running: {command}')
     process = subprocess.Popen(command, stderr=subprocess.PIPE, text=True)
@@ -115,9 +115,7 @@ def fix_ts_single(path: Path, to_ts: bool = False, flac: bool = False):
             new_video = new_path / f'{video.stem}_fixed{suf}'
             command = (ffmpeg.input(filename=str(video), probesize='50M', analyzeduration='100M',
                                     fflags='+genpts+discardcorrupt')
-                       .output(filename=str(new_video),  map=0,
-                               avoid_negative_ts='make_zero', **args)
-                       )
+                       .output(filename=str(new_video),  map=0, **args))
             print(f'running {" ".join(command.compile())}')
             command.run(overwrite_output=False)
             if rotation:

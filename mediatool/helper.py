@@ -198,7 +198,7 @@ def parse_stream(streams):
         duration=float(streams['format']['duration']),
         has_cover=bool(has_cover),
     )
-    _codec = ['h264', 'hevc', 'vp9', 'av1', 'mpeg2video']
+    _codec = ['h264', 'hevc', 'vp9', 'av1', 'mpeg2video', 'mpeg4']
     assert vinfo['codec'] in _codec, vinfo['codec']
     vinfo['height'], vinfo['width'] = sorted(
         (video_info['height'], video_info['width']))

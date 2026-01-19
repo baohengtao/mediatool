@@ -16,7 +16,7 @@ from rich.prompt import Confirm, Prompt
 from typer import Typer
 
 from mediatool import DATA_PATH, console
-from mediatool.helper import get_stream_info, get_video_path
+from mediatool.helper import copy_meta, get_stream_info, get_video_path
 
 app = Typer()
 
@@ -132,7 +132,7 @@ def extract(paths: list[Path]):
 
 
 def get_subtitles(video: Path):
-    subtitles = get_stream_info(video)['subtitles']
+    subtitles = get_stream_info(video)['subtitle']
     codec_ext_map = {
         'subrip': 'srt',
         'ass': 'ass',
@@ -206,16 +206,21 @@ def add_subtitles(video: Path):
         if f.suffix != '.srt':
             continue
         sub = {'file': f.name}
+        skip = False
         while True:
             lang_code = input(f'Enter the lang of {sub}')
             try:
                 lang = iso639.Language.match(lang_code, strict_case=False)
             except iso639.LanguageNotFoundError as e:
                 console.log(f'{e}:cannot find lang {lang_code}', style='error')
+                if skip := Confirm.ask(f'skip {f.name}?', default=False):
+                    break
             else:
                 sub['lang'] = lang_code
                 sub['title'] = lang.name
                 break
+        if skip:
+            continue
         if lang.name == 'Chinese':
             sub['title'] = questionary.select(
                 f'set title for {f.name}',
@@ -236,6 +241,7 @@ def add_subtitles(video: Path):
     command += [str(dst)]
     print(' '.join(command))
     subprocess.run(command, check=True)
+    copy_meta(video, dst)
 
 
 @app.command()

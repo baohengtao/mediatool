@@ -33,6 +33,7 @@ def print_info(paths: list[Path]):
         console.log(result)
         video.with_suffix('.nfo.json').write_text(
             json.dumps(result, indent=4, ensure_ascii=False))
+        print(result['chapters'])
 
 
 @app.command()
