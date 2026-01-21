@@ -11,6 +11,7 @@ from typer import Typer
 
 from mediatool import console
 from mediatool.helper import (
+    copy_meta,
     get_stream_info,
     get_video_path, get_xmp,
     rename_video,
@@ -83,12 +84,13 @@ def split_video(input_file: Path, change_artist=False):
 
 @app.command()
 def split_pure(input_files: list[Path], multi: bool = False):
+    keep_meta = Confirm.ask('copy meta?')
     input_files.sort(key=lambda x: hanzi_sort_key(x.name))
     for input_file in input_files:
-        split_video_pure(input_file, multi=multi)
+        split_video_pure(input_file, multi=multi, keep_meta=keep_meta)
 
 
-def split_video_pure(input_file: Path, multi: bool = False):
+def split_video_pure(input_file: Path, multi: bool = False, keep_meta: bool = False):
     if multi:
         return split_video_multi(input_file)
     while info := Prompt.ask(f'Enter time point {input_file}').strip():
@@ -98,6 +100,8 @@ def split_video_pure(input_file: Path, multi: bool = False):
             ss, to = '0', info
         part_path = input_file.with_stem(input_file.stem+'_'+info)
         run_split_command(input_file, part_path, ss, to)
+        if keep_meta:
+            copy_meta(input_file, part_path)
 
 
 def split_video_multi(input_file: Path):

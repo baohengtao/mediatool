@@ -119,8 +119,8 @@ def add_watermark(video: Path, threads: int = None, add_mask=False, crop=False):
     if dst.exists():
         console.log(f'{dst} already exist, skip...')
         return
-
-    watermark = video.with_suffix('.png')
+    if not (watermark := video.with_suffix('.png')).exists():
+        watermark = video.with_name('watermark.png')
     srt = video.with_suffix('.srt')
     output = video_input = ffmpeg.input(str(video))
     extra_inputs = []
