@@ -168,7 +168,13 @@ def run_split_command(input_file: Path, output_file: Path, ss: str = None, to: s
         command += ['-to', str(to)]
     command += ['-i', str(input_file)]
     command += ['-map', '0:v', '-map', '0:a']
-    if  get_stream_info(input_file).get('subtitles'):
+
+    stream_info = get_stream_info(input_file)
+    if cover := stream_info.get('cover'):
+        cover, *_ = cover
+        assert not _
+        command += ['-map', f'-0:{cover['index']}']
+    if stream_info.get('subtitle'):
         command += ['-map', '0:s']
     command += ['-c', 'copy', '-avoid_negative_ts',
                 'make_zero', str(output_file)]
