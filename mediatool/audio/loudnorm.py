@@ -241,7 +241,9 @@ def apply_loudness_normalization(input_filepath: Path, output_filepath: Path,
             vcodec='copy',
             acodec='flac',
             ar='48000',
-            sample_fmt='s32'
+            sample_fmt='s32',
+            scodec='copy',   # <--- keep subtitles
+            map='0:s?'       # <--- include subtitle stream if exists
         ).compile()
     console.log(f'\nrunning {" ".join(command)}', highlight=False)
     process = subprocess.Popen(command, stderr=subprocess.PIPE, text=True)
