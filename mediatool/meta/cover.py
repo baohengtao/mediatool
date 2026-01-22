@@ -1,4 +1,5 @@
 import itertools
+import subprocess
 from fractions import Fraction
 from pathlib import Path
 
@@ -9,7 +10,8 @@ from typer import Typer
 
 from mediatool import console
 from mediatool.helper import (
-    copy_meta, get_stream_info,
+    copy_meta,
+    get_stream_info,
     get_video_path, get_xmp,
     run_async, write_xmp
 )
@@ -24,6 +26,23 @@ async def cover(paths: list[Path]):
         get_video_path(p) for p in paths)
     for video in videos:
         await write_cover(video)
+
+
+@app.command()
+@run_async
+async def extract_cover(video: Path):
+    stream_info = get_stream_info(video)
+    if cover := stream_info.get('cover'):
+        cover, *_ = cover
+        assert not _
+        idx = cover['index']
+        suf = f'.{cover['codec_name']}'
+        subprocess.run([
+            "ffmpeg",
+            "-i", str(video),
+            "-map", f"0:{idx}",
+            str(video.with_suffix(suf))
+        ], check=True)
 
 
 async def get_cover_image(input: Path):
