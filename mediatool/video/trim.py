@@ -98,8 +98,7 @@ def split_video_pure(input_file: Path, multi: bool = False, keep_meta: bool = Fa
             ss, to = info.split('-')
         else:
             ss, to = '0', info
-        part_path = input_file.with_stem(input_file.stem+'_'+info)
-        run_split_command(input_file, part_path, ss, to)
+        part_path = run_split_command(input_file, ss=ss, to=to)
         if keep_meta:
             copy_meta(input_file, part_path)
 
@@ -159,12 +158,12 @@ def trim_video_segments(video_path: Path):
     concat_ts(tmp_dir)
 
 
-def run_split_command(input_file: Path, output_file: Path, ss: str = None, to: str = None):
+def run_split_command(input_file: Path, output_file: Path = None, ss: str = '', to: str = '') -> Path:
     assert ss or to
     command = ['ffmpeg']
-    if ss is not None:
+    if ss:
         command += ['-ss', str(ss)]
-    if to is not None:
+    if to:
         command += ['-to', str(to)]
     command += ['-i', str(input_file)]
     command += ['-map', '0:v', '-map', '0:a']
@@ -176,11 +175,14 @@ def run_split_command(input_file: Path, output_file: Path, ss: str = None, to: s
         command += ['-map', f'-0:{cover['index']}']
     if stream_info.get('subtitle'):
         command += ['-map', '0:s']
+
+    if output_file is None:
+        output_file = input_file.with_stem(input_file.stem+'_'+ss+'_'+to)
     command += ['-c', 'copy', '-avoid_negative_ts',
                 'make_zero', str(output_file)]
     console.log(f'Running:{" ".join(command)}')
     subprocess.run(command, check=True)
-    return command
+    return output_file
 
 
 def hanzi_sort_key(name):
