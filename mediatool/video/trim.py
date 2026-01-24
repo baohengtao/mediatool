@@ -115,14 +115,22 @@ def split_video_multi(input_file: Path):
         console.log(f'{folder} already exists and not empty, skip...')
         return
     folder.mkdir(exist_ok=True)
-    while info := Prompt.ask(f'Enter time point {input_file}').strip():
-        points = ['']+info.split()+['']
-        for ss, to in zip(points[:-1], points[1:]):
-            arg = {'ss': ss, 'to': to}
-            arg = {k: v for k, v in arg.items() if v}
-            part_path = (folder / f'{input_file.stem}'
-                         f'_{ss}_{to}{input_file.suffix}')
-            run_split_command(input_file, part_path, **arg)
+    split_info = input_file.with_name(f'{input_file.stem}_split.txt')
+    if split_info.exists():
+        info = split_info.read_text()
+    else:
+        info = Prompt.ask(f'Enter time point {input_file}').strip()
+        if not info:
+            return
+        split_info.write_text(info)
+
+    points = ['']+info.split()+['']
+    for ss, to in zip(points[:-1], points[1:]):
+        arg = {'ss': ss, 'to': to}
+        arg = {k: v for k, v in arg.items() if v}
+        part_path = (folder / f'{input_file.stem}'
+                     f'_{ss}_{to}{input_file.suffix}')
+        run_split_command(input_file, part_path, **arg)
 
 
 @app.command()
