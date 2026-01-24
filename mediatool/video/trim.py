@@ -15,6 +15,7 @@ from mediatool.helper import (
     get_stream_info,
     get_video_path, get_xmp,
     rename_video,
+    secs_to_timestr,
     timestr_to_secs, write_xmp
 )
 
@@ -162,6 +163,13 @@ def run_split_command(input_file: Path, output_file: Path = None, ss: str = '', 
     assert ss or to
     command = ['ffmpeg']
     if ss:
+        try:
+            ss2 = nearest_keyframe(input_file, ss)
+            console.log(f'find nearest keyframe of {ss} at {ss2}')
+        except:
+            pass
+        else:
+            ss = ss2 or ss
         command += ['-ss', str(ss)]
     if to:
         command += ['-to', str(to)]
@@ -189,3 +197,37 @@ def hanzi_sort_key(name):
     pinyin = lazy_pinyin(name)
     prefix = int(pinyin[0] != name)
     return (prefix, pinyin)
+
+
+def nearest_keyframe(input_file: Path, target_time: float):
+    """
+    Returns nearest keyframe timestamp <= target_time in seconds
+    using ffprobe via subprocess.
+    """
+    # Read a small window around target_time
+    window = 10
+    target_time = timestr_to_secs(target_time)
+    read_start = max(0, target_time - window)
+    read_interval = f"{read_start}%+{window+1}"
+
+    cmd = [
+        "ffprobe",
+        "-select_streams", "v",
+        "-skip_frame", "nokey",
+        "-read_intervals", read_interval,
+        "-show_frames",
+        "-show_entries", "frame=pts_time",
+        "-of", "csv=p=0",
+        str(input_file)
+    ]
+    print(' '.join(cmd))
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    print(result.stdout)
+    keyframes = [float(line)
+                 for line in result.stdout.strip().splitlines() if line]
+
+    # Pick the largest keyframe <= target_time
+    nearest = max((kf for kf in keyframes if kf <=
+                  target_time), default=keyframes[0])
+    nearest = secs_to_timestr(nearest)
+    return nearest
