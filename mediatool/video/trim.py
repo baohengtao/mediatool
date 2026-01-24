@@ -84,16 +84,14 @@ def split_video(input_file: Path, change_artist=False):
 
 
 @app.command()
-def split_pure(input_files: list[Path], multi: bool = False):
+def split_pure(input_files: list[Path]):
     keep_meta = Confirm.ask('copy meta?')
     input_files.sort(key=lambda x: hanzi_sort_key(x.name))
     for input_file in input_files:
-        split_video_pure(input_file, multi=multi, keep_meta=keep_meta)
+        split_video_pure(input_file, keep_meta=keep_meta)
 
 
-def split_video_pure(input_file: Path, multi: bool = False, keep_meta: bool = False):
-    if multi:
-        return split_video_multi(input_file)
+def split_video_pure(input_file: Path, keep_meta: bool = False):
     while info := Prompt.ask(f'Enter time point {input_file}').strip():
         if '-' in info:
             ss, to = info.split('-')
@@ -104,16 +102,27 @@ def split_video_pure(input_file: Path, multi: bool = False, keep_meta: bool = Fa
             copy_meta(input_file, part_path)
 
 
+@app.command()
+def split_multi(input_files: list[Path]):
+    input_files.sort(key=lambda x: hanzi_sort_key(x.name))
+    for input_file in input_files:
+        split_video_multi(input_file)
+
+
 def split_video_multi(input_file: Path):
+    folder = input_file.with_name(input_file.stem)
+    if folder.exists() and any(folder.iterdir()):
+        console.log(f'{folder} already exists and not empty, skip...')
+        return
+    folder.mkdir(exist_ok=True)
     while info := Prompt.ask(f'Enter time point {input_file}').strip():
         points = ['']+info.split()+['']
-        if not points:
-            return
         for ss, to in zip(points[:-1], points[1:]):
             arg = {'ss': ss, 'to': to}
             arg = {k: v for k, v in arg.items() if v}
-            part_path = input_file.with_stem(input_file.stem+'_'+ss+'_'+to)
-            run_split_command(input_file, part_path, *arg)
+            part_path = (folder / f'{input_file.stem}'
+                         f'_{ss}_{to}{input_file.suffix}')
+            run_split_command(input_file, part_path, **arg)
 
 
 @app.command()
