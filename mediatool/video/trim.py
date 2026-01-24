@@ -186,8 +186,10 @@ def run_split_command(input_file: Path, output_file: Path = None, ss: str = '', 
 
     if output_file is None:
         output_file = input_file.with_stem(input_file.stem+'_'+ss+'_'+to)
-    command += ['-c', 'copy', '-avoid_negative_ts',
-                'make_zero', str(output_file)]
+    scodec = 'mov_text' if input_file.suffix == '.mp4' else 'srt'
+    command += ['-c', 'copy', '-c:s', scodec,
+                '-reset_timestamps', '1',
+                str(output_file)]
     console.log(f'Running:{" ".join(command)}')
     subprocess.run(command, check=True)
     return output_file
