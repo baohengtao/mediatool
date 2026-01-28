@@ -1,13 +1,15 @@
 import itertools
+import subprocess
 from pathlib import Path
 
 import ffmpeg
 import pendulum
 from mutagen.mp4 import MP4, MP4Cover
+from rich.prompt import Prompt
 from typer import Typer
 
 from mediatool import DATA_PATH, console
-from mediatool.helper import get_video_path, get_xmp
+from mediatool.helper import get_stream_info, get_video_path, get_xmp
 
 app = Typer()
 
@@ -50,3 +52,73 @@ def convert_video_to_m4a(video_path: Path):
     meta = get_xmp(video_path)
     write_id3(m4a_file, meta)
     console.log(f'🎉 successfully get {m4a_file}', style='notice')
+
+
+@app.command(name='to-mp4')
+def convert_audio_to_mp4(audio: Path, image: Path = None):
+    while not (image and image.exists() and image.is_file()):
+        image = Prompt.ask('Enter the image path')
+        image = Path(image)
+    if audio.is_dir():
+        for f in audio.iterdir():
+            convert_audio_to_mp4(f, image)
+    if audio.suffix not in ['.flac', '.mp3']:
+        return
+    info = get_stream_info(audio)
+    assert not info.get('video')
+    a, *_ = info['audio']
+    assert not _
+    video = image_to_video(image, duration=float(a['duration']))
+    output = audio.with_suffix('.mp4')
+    command = ["ffmpeg", "-i", str(video), "-i", str(audio),
+               "-c", "copy", "-shortest", str(output)]
+    console.log(f'Running {''.join(command)}')
+    subprocess.run(command, check=True)
+    return output
+
+
+def image_to_video(image_path: Path, duration: float):
+    """
+    Create a video from a still image that loops to match a desired duration.
+
+    Args:
+        image_path (Path): Path to the still image.
+        duration (float): Minimum video duration in seconds.
+    """
+    # Step 1: create base video (length >= keyframe interval)
+    keyframe_interval_sec = 10
+    base_length = max(keyframe_interval_sec, 1)  # at least 1 second
+    base_video = image_path.with_name(f'{image_path.stem}_base.mp4')
+    if not base_video.exists():
+        fps = 25
+        ffmpeg_base_cmd = [
+            "ffmpeg",
+            "-loop", "1",                  # required to loop the image
+            "-i", str(image_path),
+            "-t", str(base_length),        # duration
+            "-c:v", "libx264",             # H.264 codec
+            "-b:v", f"500k",   # target bitrate
+            # frame rate (optional, safe to keep)
+            "-r", str(fps),
+            "-g", str(fps * keyframe_interval_sec),  # keyframe interval
+            str(base_video)                # output
+        ]
+        subprocess.run(ffmpeg_base_cmd, check=True)
+    while True:
+        base_length = get_stream_info(base_video)['vinfo']['duration']
+        if base_length > duration:
+            return base_video
+        list_file = base_video.with_name("list.txt")
+        list_file.write_text(
+            "\n".join(f"file '{base_video}'" for _ in range(2)))
+        tmp_file = base_video.with_name('tmp.mp4')
+        ffmpeg_concat_cmd = [
+            "ffmpeg",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(list_file),
+            "-c", "copy",
+            str(tmp_file)
+        ]
+        subprocess.run(ffmpeg_concat_cmd, check=True)
+        tmp_file.rename(base_video)

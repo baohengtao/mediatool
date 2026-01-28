@@ -173,10 +173,11 @@ def get_stream_info(video_path):
     assert not info
     streams = dict(streams.items())
     for k in ['video', 'audio']:
-        if (x := len(streams[k])) > 1:
+        if (x := len(streams.get(k, []))) > 1:
             console.log(f'{x} {k} streams found', style='error')
             return streams
-    streams['vinfo'] = parse_stream(streams)
+    if streams.get('video'):
+        streams['vinfo'] = parse_stream(streams)
     return streams
 
 
@@ -194,7 +195,6 @@ def parse_stream(streams):
         bit_rate=f"{x/1000_000:.1f}M",
         chapters=streams['chapters'],
         fps=round(fractions.Fraction(fps) if fps != '0/0' else 0),
-        channels=int(audio_info['channels']),
         duration=float(streams['format']['duration']),
         has_cover=bool(has_cover),
     )
@@ -215,9 +215,13 @@ def parse_stream(streams):
         suffix.append(f'{w}p')
     if (fps := vinfo['fps']) > 30:
         suffix.append(f'{fps}fps')
-    assert vinfo['channels'] in [1, 2, 5, 6]
-    if vinfo['channels'] == 1:
-        suffix.append('mono')
+    if audio_info:
+        vinfo |= dict(
+            channels=int(audio_info['channels']),
+        )
+        assert vinfo['channels'] in [1, 2, 5, 6]
+        if vinfo['channels'] == 1:
+            suffix.append('mono')
     if vinfo['codec'] != 'h264':
         suffix.append(vinfo['codec'])
     if has_cover:
