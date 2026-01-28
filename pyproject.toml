@@ -8,7 +8,7 @@ authors = [{name = "BaoHengtao", email = "baohengtao@users.noreply.github.com"}]
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
 dynamic = ["version", "description"]
-dependencies=['ffmpeg-python', 'mutagen']
+dependencies=['ffmpeg-python', 'mutagen','gemini-srt-translator','python-iso639','opencc-python-reimplemented', 'pysrt']
 
 
 [project.urls]
