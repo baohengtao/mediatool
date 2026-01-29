@@ -65,6 +65,65 @@ def concat_ts(path: Path) -> Path:
     return rename_video(merged)
 
 
+def generate_transition(
+    output_file: str,
+    first_video: str | None = None,
+    second_video: str | None = None,
+    duration: float = 1.0,
+):
+    if not first_video and not second_video:
+        raise ValueError("At least one video must be provided")
+    inputs = []
+    fc_parts = []
+    input_index = 0
+    first_v = first_a = None
+    second_v = second_a = None
+    if first_video:
+        inputs += ["-sseof", f"-{duration}", "-i", str(first_video)]
+        fc_parts += [
+            f"[{input_index}:v]setpts=PTS-STARTPTS[v0]",
+            f"[{input_index}:a]asetpts=PTS-STARTPTS[a0]",
+        ]
+        first_v, first_a = "v0", "a0"
+        input_index += 1
+    if second_video:
+        inputs += ["-i", str(second_video)]
+        fc_parts += [
+            f"[{input_index}:v]trim=start=0:end={duration},setpts=PTS-STARTPTS[v1]",
+            f"[{input_index}:a]atrim=start=0:end={duration},asetpts=PTS-STARTPTS[a1]",
+        ]
+        second_v, second_a = "v1", "a1"
+    if first_v and second_v:
+        fc_parts += [
+            f"[{first_v}]fade=t=out:d={duration}[v0f]",
+            f"[{first_a}]afade=t=out:d={duration}[a0f]",
+            f"[{second_v}]fade=t=in:d={duration}[v1f]",
+            f"[{second_a}]afade=t=in:d={duration}[a1f]",
+            f"[v0f][v1f]concat=n=2:v=1:a=0[v]",
+            f"[a0f][a1f]concat=n=2:v=0:a=1[a]",
+        ]
+    elif first_v:
+        fc_parts += [
+            f"[{first_v}]fade=t=out:d={duration}[v]",
+            f"[{first_a}]afade=t=out:d={duration}[a]",
+        ]
+    else:
+        fc_parts += [
+            f"[{second_v}]fade=t=in:d={duration}[v]",
+            f"[{second_a}]afade=t=in:d={duration}[a]",
+        ]
+
+    cmd = [
+        "ffmpeg",
+        *inputs,
+        "-filter_complex", "; ".join(fc_parts),
+        "-map", "[v]",
+        "-map", "[a]",
+        str(output_file),
+    ]
+    subprocess.run(cmd, check=True)
+
+
 @app.command()
 def fix_ts(paths: list[Path], to_ts: bool = False, flac: bool = False):
     for path in paths:
