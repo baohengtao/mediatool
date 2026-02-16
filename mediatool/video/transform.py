@@ -100,17 +100,14 @@ def reencoding_video(target_video: Path,  reference_video: Path = None):
 
 
 @app.command()
-def watermark(paths: list[Path], threads: int = None,
-              add_mask: bool = False, crop: bool = False):
+def watermark(paths: list[Path], add_mask: bool = False, crop: bool = False):
     videos = itertools.chain.from_iterable(
         get_video_path(p) for p in paths)
-    sleep_time, _ = timedInput('enter delay seconds: ', timeout=5)
-    timedInput(timeout=int(sleep_time or 0))
     for video in videos:
-        add_watermark(video, threads, add_mask=add_mask, crop=crop)
+        add_watermark(video, add_mask=add_mask, crop=crop)
 
 
-def add_watermark(video: Path, threads: int = None, add_mask=False, crop=False):
+def add_watermark(video: Path, add_mask=False, crop=False):
     console.log(f'processing {video}')
     if video.stem.endswith('_watermark'):
         console.log(f'{video} already has watermark, skip...')
@@ -165,7 +162,7 @@ def add_watermark(video: Path, threads: int = None, add_mask=False, crop=False):
             output = output.filter('scale', 1920, 1080)
     if output is video_input:
         return
-    extra_args = {'threads': threads} if threads else {}
+    extra_args = {}
     extra_args['movflags'] = 'frag_keyframe+empty_moov+default_base_moof'
     extra_args |= {'scodec': 'mov_text',
                    'metadata:s:s:0': 'language=chi'} if extra_inputs else {}
