@@ -4,12 +4,13 @@ import subprocess
 from pathlib import Path
 
 import ffmpeg
+from rich.prompt import Confirm
 from typer import Typer
 
 from mediatool import console
 from mediatool.helper import (
     copy_meta,
-    get_stream_info,
+    get_stream_info, get_xmp,
     rename_video, write_xmp
 )
 from mediatool.meta.chapter import get_chapters_text, write_chapters
@@ -19,11 +20,12 @@ app = Typer()
 
 @app.command()
 def concat(paths: list[Path]):
+    copy_meta = Confirm.ask('copy meta?')
     for path in paths:
-        concat_ts(path)
+        concat_ts(path, copy_meta=copy_meta)
 
 
-def concat_ts(path: Path) -> Path:
+def concat_ts(path: Path, copy_meta: bool = False) -> Path:
     if not path.is_dir():
         return
     suffixs = ['.mp4', '.ts', '.mkv']
@@ -61,7 +63,10 @@ def concat_ts(path: Path) -> Path:
 
     if (xmp_file := path / 'xmp.json').exists():
         xmp_info = json.loads(xmp_file.read_text())
-        write_xmp(merged, xmp_info)
+    else:
+        xmp_info = get_xmp(videos[0]) if copy_meta else {}
+
+    write_xmp(merged, xmp_info)
     return rename_video(merged)
 
 
@@ -171,9 +176,12 @@ def fix_ts_single(path: Path, to_ts: bool = False, flac: bool = False):
             if flac:
                 args |= {'c:a': 'flac', 'ar': '48000',
                          'sample_fmt': 's32'}
+            else:
+                args |= {'bsf:a': 'aac_adtstoasc'}
             new_video = new_path / f'{video.stem}_fixed{suf}'
             command = (ffmpeg.input(filename=str(video), probesize='50M', analyzeduration='100M',
-                                    fflags='+genpts+discardcorrupt')
+                                    fflags='+genpts+discardcorrupt',
+                                    err_detect='ignore_err')
                        .output(filename=str(new_video),  map=0, **args))
             print(f'running {" ".join(command.compile())}')
             command.run(overwrite_output=False)

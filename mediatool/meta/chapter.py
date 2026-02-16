@@ -137,7 +137,7 @@ def fix_chapter(paths: list[Path]):
 
 def fix_chapter_single(video_path: Path):
     vinfo = get_stream_info(video_path)
-    chapters, duration = vinfo['chapters'],  vinfo['format']['duration']
+    chapters, duration = vinfo['chapters'],  float(vinfo['format']['duration'])
     flag = False
     while chapters and float(chapters[-1]['start_time']) > duration:
         chapters.pop()
