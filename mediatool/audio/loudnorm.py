@@ -1,6 +1,8 @@
 import itertools
 import json
 import subprocess
+import time
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import ffmpeg
@@ -94,23 +96,37 @@ def get_loudness_stats(input_filepath: Path) -> dict:
 
 @app.command()
 def normalize(path: Path, target_i: float = None, tp: float = None,
-              lra: float = None, dynamic: bool = False):
+              lra: float = None, dynamic: bool = False, workers: int = 4):
+    max_workers = max(1, workers)
+    seen = set()
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        inflight = {}
+        while True:
+            done_futures = [future for future in inflight if future.done()]
+            for future in done_futures:
+                inflight.pop(future)
+                future.result()
 
-    has_normalized = set()
-    while True:
-        for video in get_video_path(path):
-            if video in has_normalized:
-                continue
-            if video.stem.endswith('_normalized'):
-                continue
-            if video.with_stem(video.stem+'_normalized').exists():
-                continue
-            break
-        else:
-            break
-        console.rule(f"processing {video}")
-        normalize_volume(video, target_i, tp, lra, linear=not dynamic)
-        has_normalized.add(video)
+            for video in get_video_path(path):
+                if video in seen:
+                    continue
+                if video.stem.endswith('_normalized'):
+                    continue
+                if video.with_stem(video.stem+'_normalized').exists():
+                    continue
+                if len(inflight) >= max_workers:
+                    break
+                console.rule(f"processing {video}")
+                future = executor.submit(
+                    normalize_volume, video, target_i,
+                    tp, lra, not dynamic
+                )
+                inflight[future] = video
+                seen.add(video)
+
+            if not inflight:
+                break
+            time.sleep(10)
 
 
 def normalize_volume(filepath: Path, target_i: float = None, tp: float = None,
