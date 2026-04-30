@@ -4,6 +4,7 @@ import fractions
 import itertools
 import time
 from collections import defaultdict
+from copy import deepcopy
 from functools import wraps
 from pathlib import Path
 from typing import Iterator
@@ -158,7 +159,10 @@ def get_video_path(path: Path) -> Iterator[Path]:
 
 
 def get_stream_info(video_path):
-    info = ffmpeg.probe(video_path, show_chapters=None)
+    if not isinstance(video_path, dict):
+        info = ffmpeg.probe(video_path, show_chapters=None)
+    else:
+        info = deepcopy(video_path)
     streams = defaultdict(list)
     for s in info.pop('streams'):
         if s['codec_name'] in ['mjpeg', 'png']:

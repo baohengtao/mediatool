@@ -1,5 +1,6 @@
 import itertools
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -38,7 +39,7 @@ def split_video(input_file: Path, change_artist=False):
         split_video_pure(input_file)
         return
     meta = get_xmp(input_file)
-    if change_artist or meta.get('XMP:Artist') in ['文艺中国', '爆米花戏曲']:
+    if change_artist or meta.get('XMP:Artist') in ['文艺中国', '爆米花戏曲', '越剧小虎']:
         meta.pop('XMP:Artist', None)
     if meta.get('XMP:Title'):
         if Confirm.ask(f'{input_file} already has title, skip?', default=True):
@@ -156,7 +157,7 @@ def trim_video_segments(video_path: Path):
     remains, ns = [], 0
     duration = float(ffmpeg.probe(video_path)['format']['duration'])
     for s, e in sorted(segs):
-        assert s <= e
+        assert s < e
         if s >= duration:
             break
         if ns < s:
@@ -223,7 +224,8 @@ def nearest_keyframe(input_file: Path, target_time: float):
     """
     # Read a small window around target_time
     window = 10
-    target_time = timestr_to_secs(target_time)
+    if isinstance(target_time, str):
+        target_time = timestr_to_secs(target_time)
     read_start = max(0, target_time - window)
     read_interval = f"{read_start}%+{window+1}"
 
@@ -240,8 +242,10 @@ def nearest_keyframe(input_file: Path, target_time: float):
     print(' '.join(cmd))
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     print(result.stdout)
-    keyframes = [float(line)
-                 for line in result.stdout.strip().splitlines() if line]
+    keyframes = []
+    for line in result.stdout.strip().splitlines():
+        if m := re.match(r'\s*(\d+(?:\.\d+)?)', line):
+            keyframes.append(float(m.group(1)))
 
     # Pick the largest keyframe <= target_time
     nearest = max((kf for kf in keyframes if kf <=
