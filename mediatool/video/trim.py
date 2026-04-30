@@ -180,13 +180,11 @@ def run_split_command(input_file: Path, output_file: Path = None, ss: str = '', 
     assert ss or to
     command = ['ffmpeg']
     if ss:
-        try:
-            ss2 = nearest_keyframe(input_file, ss)
-            console.log(f'find nearest keyframe of {ss} at {ss2}')
-        except:
-            pass
-        else:
-            ss = ss2 or ss
+        ss2 = nearest_keyframe(input_file, ss)
+        console.log(f'find nearest keyframe of {ss} at {ss2}')
+        if not ss2:
+            console.log(f'ss2={ss2}, failed', style='error')
+        ss = ss2 or ss
         command += ['-ss', str(ss)]
     if to:
         command += ['-to', str(to)]

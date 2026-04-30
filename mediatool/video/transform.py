@@ -5,7 +5,6 @@ from collections import defaultdict
 from pathlib import Path
 
 import ffmpeg
-from pytimedinput import timedInput
 from rich.prompt import Confirm, Prompt
 from typer import Typer
 

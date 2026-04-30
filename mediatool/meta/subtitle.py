@@ -122,7 +122,7 @@ def dual(upper_srt: Path, down_srt: Path):
     output_file = upper_srt.with_stem(upper_srt.stem+'_merged')
     if output_file.exists():
         if not Confirm.ask(f'{output_file} exist, overwrite?'):
-            console.log(f'abort process...')
+            console.log('abort process...')
             return
     merged_subs.clean_indexes()
     merged_subs.save(output_file, encoding='utf-8')
@@ -148,20 +148,19 @@ def get_subtitles(video: Path):
         'dvb_subtitle': 'dvb',
         'webvtt': 'vtt'
     }
-    NEED_ALL = False
+    need_all = False
     for subtitle in subtitles:
         lang_code = subtitle.get('tags', {}).get('language', 'und')
         try:
             lang = iso639.Language.match(lang_code, strict_case=False)
-        except iso639.LanguageNotFoundError as e:
+        except iso639.LanguageNotFoundError:
             continue
         if lang.name in ['English', 'Chinese']:
             break
     else:
-        NEED_ALL = True
+        need_all = True
     if len(subtitles) <= 4:
-        NEED_ALL = True
-
+        need_all = True
     for subtitle in subtitles:
         idx = subtitle['index']
         codec = subtitle['codec_name']
@@ -173,7 +172,7 @@ def get_subtitles(video: Path):
             console.log(f'{e}:cannot find lang {lang_code}', style='error')
             lang = None
         if lang and lang.name not in ['English', 'Chinese', 'Undetermined']:
-            if not NEED_ALL:
+            if not need_all:
                 console.log(f'ignore language: {lang.name}')
                 continue
         title = subtitle.get('tags', {}).get('title', '')

@@ -25,7 +25,7 @@ def concat(paths: list[Path]):
         concat_ts(path, copy_meta=copy_meta)
 
 
-def concat_ts(path: Path, copy_meta: bool = False) -> Path:
+def concat_ts(path: Path, copy_meta: bool = False) -> Path | None:
     if not path.is_dir():
         return
     suffixs = ['.mp4', '.ts', '.mkv']
@@ -104,8 +104,8 @@ def generate_transition(
             f"[{first_a}]afade=t=out:d={duration}[a0f]",
             f"[{second_v}]fade=t=in:d={duration}[v1f]",
             f"[{second_a}]afade=t=in:d={duration}[a1f]",
-            f"[v0f][v1f]concat=n=2:v=1:a=0[v]",
-            f"[a0f][a1f]concat=n=2:v=0:a=1[a]",
+            "[v0f][v1f]concat=n=2:v=1:a=0[v]",
+            "[a0f][a1f]concat=n=2:v=0:a=1[a]",
         ]
     elif first_v:
         fc_parts += [

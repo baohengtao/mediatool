@@ -97,7 +97,7 @@ def image_to_video(image_path: Path, duration: float):
             "-i", str(image_path),
             "-t", str(base_length),        # duration
             "-c:v", "libx264",             # H.264 codec
-            "-b:v", f"500k",   # target bitrate
+            "-b:v", "500k",   # target bitrate
             # frame rate (optional, safe to keep)
             "-r", str(fps),
             "-g", str(fps * keyframe_interval_sec),  # keyframe interval
