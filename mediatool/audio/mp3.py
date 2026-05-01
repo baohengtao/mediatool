@@ -15,6 +15,19 @@ app = Typer()
 
 
 @app.command()
+def flac2m4a(audios: list[Path]):
+    for audio in audios:
+        if audio.suffix != '.flac':
+            continue
+        if (m4a := audio.with_suffix('.m4a')).exists():
+            continue
+        command = ["ffmpeg", "-i", str(audio),
+                   "-c:a", "alac", "-c:v", "copy",
+                   "-map_metadata", "0", str(m4a)]
+        subprocess.run(command, check=True)
+
+
+@app.command()
 def to_audio(paths: list[Path]):
     videos = itertools.chain.from_iterable(
         get_video_path(p) for p in paths)
