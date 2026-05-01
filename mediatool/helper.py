@@ -232,7 +232,6 @@ def parse_stream(streams):
         suffix.append('covered')
 
     vinfo['suffix'] = suffix
-    vinfo |= dict(audio=audio_info, video=video_info)
     return vinfo
 
 
@@ -241,3 +240,32 @@ def secs_to_timestr(seconds: float) -> str:
     m = int((seconds % 3600) // 60)
     s = seconds % 60
     return f"{h:02}:{m:02}:{s:06.3f}"
+
+
+def merge_intervals(intervals: list[list[int]]) -> list[list[int]]:
+    """
+    Merge overlapping intervals in a list.
+
+    Args:
+        intervals: A list of intervals, each interval is [start, end].
+
+    Returns:
+        A list of merged intervals with no overlaps, sorted by start time.
+
+    Example:
+        >>> merge_intervals([[1,3], [2,6], [8,10], [15,18]])
+        [[1, 6], [8, 10], [15, 18]]
+    """
+    if not intervals:
+        return []
+    intervals.sort(key=lambda x: x[0])
+    merged: list[list[int]] = [intervals[0]]
+
+    for s, e in intervals[1:]:
+        last = merged[-1]
+        if s <= last[1]:
+            last[1] = max(last[1], e)  # merge overlapping
+        else:
+            merged.append([s, e])  # add new interval
+
+    return merged

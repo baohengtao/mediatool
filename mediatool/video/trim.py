@@ -15,6 +15,7 @@ from mediatool.helper import (
     copy_meta,
     get_stream_info,
     get_video_path, get_xmp,
+    merge_intervals,
     rename_video,
     secs_to_timestr,
     timestr_to_secs, write_xmp
@@ -154,6 +155,7 @@ def trim_video_segments(video_path: Path):
         return
     console.log(f'trim {segs}')
     segs = [[timestr_to_secs(x) for x in seg.split('-')] for seg in segs]
+    segs = merge_intervals(segs)
     remains, ns = [], 0
     duration = float(ffmpeg.probe(video_path)['format']['duration'])
     for s, e in sorted(segs):
