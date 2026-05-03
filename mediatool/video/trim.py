@@ -233,10 +233,10 @@ def nearest_keyframe(input_file: Path, target_time: float):
 
     cmd = [
         "ffprobe",
+        "-v", "error",
         "-select_streams", "v",
         "-skip_frame", "nokey",
         "-read_intervals", read_interval,
-        "-show_frames",
         "-show_entries", "frame=pts_time",
         "-of", "csv=p=0",
         str(input_file)
