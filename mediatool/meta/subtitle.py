@@ -16,7 +16,8 @@ from rich.prompt import Confirm, Prompt
 from typer import Typer
 
 from mediatool import DATA_PATH, console
-from mediatool.helper import copy_meta, get_stream_info, get_video_path
+from mediatool.helper import get_stream_info, get_video_path
+from mediatool.metadata import FFmpegMeta
 
 app = Typer()
 
@@ -238,6 +239,7 @@ def add_subtitles(video: Path):
     for i in range(len(subs)):
         command += ["-map", str(i+1)]
     command += ["-map", "0", "-c", "copy"]
+    command += FFmpegMeta.KEEP_META
     if dst.suffix == '.mp4':
         command += ["-scodec", "mov_text"]
     for idx, sub in enumerate(subs):
@@ -246,7 +248,6 @@ def add_subtitles(video: Path):
     command += [str(dst)]
     print(' '.join(command))
     subprocess.run(command, check=True)
-    copy_meta(video, dst)
 
 
 @app.command()

@@ -2,14 +2,14 @@ import itertools
 import subprocess
 from pathlib import Path
 
-import ffmpeg
 import pendulum
 from mutagen.mp4 import MP4, MP4Cover
 from rich.prompt import Prompt
 from typer import Typer
 
 from mediatool import DATA_PATH, console
-from mediatool.helper import get_stream_info, get_video_path, get_xmp
+from mediatool.helper import get_stream_info, get_video_path
+from mediatool.metadata import read_metadata
 
 app = Typer()
 
@@ -38,16 +38,16 @@ def to_audio(paths: list[Path]):
 def write_id3(m4a_file, meta: dict[str, str]):
     audio = MP4(m4a_file)
     audio['©alb'] = '婺剧Live'
-    audio['©name'] = meta['XMP:Title']
-    audio['©ART'] = meta['XMP:Artist']
-    audio['©gen'] = '戏曲'
-
-    image_data = DATA_PATH.with_name('artwork.jpg').read_bytes()
+    audio['©name'] = meta['title']
+    audio['©ART'] = meta['artist']
+    audio['©gen'] = meta['genre']
+    image_data = (DATA_PATH/'artwork.jpg').read_bytes()
     cover = MP4Cover(image_data, imageformat=MP4Cover.FORMAT_JPEG)
     audio.tags['covr'] = [cover]
     audio.tags['aART'] = '婺剧Live'
-    if created_at := meta.get('XMP:DateCreated'):
-        created_at = pendulum.from_format(created_at, 'YYYY:MM:DD HH:mm:ss')
+    if created_at := meta.get('creation_time'):
+        created_at = pendulum.from_format(
+            created_at, 'YYYY-MM-DD[T]HH:mm:ssZZ')
         audio.tags['©day'] = created_at.strftime('%Y-%m-%dT%H:%M:%S')
     audio.save()
 
@@ -58,11 +58,11 @@ def convert_video_to_m4a(video_path: Path):
     if m4a_file.exists():
         console.log(f'{m4a_file} already exists, skipping...')
         return
-    command = ffmpeg.input(filename=str(video_path)).output(
-        filename=str(m4a_file), acodec='copy', vn=True)
-    console.log(f'running {command.compile()}')
-    command.run()
-    meta = get_xmp(video_path)
+    command = ['ffmpeg', '-i', str(video_path),
+               '-acodec', 'alac', '-vn', str(m4a_file)]
+    print(f'running {' '.join(command)}')
+    subprocess.run(command, check=True)
+    meta = read_metadata(video_path, with_sound=True)
     write_id3(m4a_file, meta)
     console.log(f'🎉 successfully get {m4a_file}', style='notice')
 

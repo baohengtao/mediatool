@@ -6,13 +6,18 @@ import ffmpeg
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import (
-    get_video_path, get_xmp,
-    rename_video,
-    secs_to_timestr
-)
+from mediatool.helper import get_video_path, rename_video, secs_to_timestr
+from mediatool.metadata import fix_meta
 
 app = Typer()
+
+
+@app.command(name='fix-meta')
+def fix_meta_command(paths: list[Path]):
+    videos = itertools.chain.from_iterable(
+        get_video_path(p) for p in sorted(paths))
+    for video in videos:
+        fix_meta(video)
 
 
 @app.command()
@@ -28,7 +33,6 @@ def print_info(paths: list[Path]):
         result = {}
         if chapters:
             result['chapters'] = '\n'.join(chapters)
-        result |= get_xmp(video)
         result |= vinfo
         console.log(result)
         video.with_suffix('.nfo.json').write_text(

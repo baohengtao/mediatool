@@ -5,27 +5,24 @@ from pathlib import Path
 
 import ffmpeg
 import requests
+from bilibili_api.video import Video
 from rich.prompt import Prompt
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import (
-    copy_meta,
-    get_stream_info,
-    get_video_path, get_xmp,
-    run_async, write_xmp
-)
+from mediatool.helper import get_stream_info, get_video_path, run_async
+from mediatool.metadata import read_metadata, write_metadata
 
 app = Typer()
 
 
 @app.command()
 @run_async
-async def cover(paths: list[Path]):
+async def cover(paths: list[Path], use_ffmpeg: bool = False):
     videos = itertools.chain.from_iterable(
         get_video_path(p) for p in paths)
     for video in videos:
-        await write_cover(video)
+        await write_cover(video, use_ffmepg=use_ffmpeg)
 
 
 @app.command()
@@ -45,23 +42,22 @@ async def extract_cover(video: Path):
         ], check=True)
 
 
-async def get_cover_image(input: Path):
-    from bilibili_api import video
-    meta = get_xmp(input)
-    if not (bili_url := meta.get('XMP:ResourceID', '')):
+async def get_cover_image(video_path: Path):
+    meta = read_metadata(video_path, with_sound=True)
+    if not (bili_url := meta.get('bv_id', '')):
         console.log(meta)
-        bili_url = Prompt.ask(f"Enter the bilibili id of {input.name}")
+        bili_url = Prompt.ask(f"Enter the bilibili id of {video_path.name}")
         if (bili_id := bili_url.split('?')[0].strip('/').split('/')[-1]):
             bili_url = f"https://bilibili.com/video/{bili_id}"
-            write_xmp(input, {'XMP:ResourceID': bili_url})
+            write_metadata(video_path, {'bv_id': bili_url})
     if bili_id := bili_url.split('?')[0].split('/')[-1]:
-        v = video.Video(bvid=bili_id)
+        v = Video(bvid=bili_id)
         pic_url = (await v.get_info())['pic']
     else:
-        *_, pic_url = meta.get('XMP:URLUrl', ' ').split()
+        *_, pic_url = meta.get('url', ' ').split()
     if not pic_url:
         return
-    cover_image = input.with_suffix('.jpg')
+    cover_image = video_path.with_suffix('.jpg')
     while True:
         r = requests.get(pic_url)
         console.log(f'get {pic_url}')
@@ -73,7 +69,7 @@ async def get_cover_image(input: Path):
     return cover_image
 
 
-async def write_cover(input: Path):
+async def write_cover(input: Path, use_ffmepg: bool = False):
     if get_stream_info(input).get('cover'):
         console.log(f'{input.name}: already write cover, skip...')
         return
@@ -88,21 +84,14 @@ async def write_cover(input: Path):
         if not (cover_image := await get_cover_image(input)):
             console.log(f'no cover img found for {input}')
             return
-
-    # 输入视频和封面图片
-    video = ffmpeg.input(input)
-    cover = ffmpeg.input(cover_image)
-
-    # 输出视频，保留原视频和音频，添加封面
-    (
-        ffmpeg
-        .output(video, cover, filename=output,
-                c='copy',             # 保持原视频音频不变
-                **{'disposition:v:1': 'attached_pic'})  # 将图片设为封面
-        .global_args('-map', '0', '-map', '1')
-        .run()
-    )
-    copy_meta(input, output, with_sound=True)
+    if use_ffmepg:
+        cmd = ['ffmpeg', '-i', str(input), '-i', str(cover_image), '-disposition:v:1', 'attached_pic',
+               '-map', '0', '-map', '1', '-map_metadata', '0', '-c', 'copy', str(output)]
+    else:
+        cmd = ["AtomicParsley", str(input),
+               "--artwork", str(cover_image), "--output", str(output)]
+    print(f'running command {' '.join(cmd)}')
+    subprocess.run(cmd, check=True)
 
 
 def write_cover_v2(input: Path):

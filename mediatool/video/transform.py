@@ -9,7 +9,8 @@ from rich.prompt import Confirm, Prompt
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import copy_meta, get_stream_info, get_video_path
+from mediatool.helper import get_stream_info, get_video_path
+from mediatool.metadata import FFmpegMeta
 
 app = Typer()
 
@@ -161,26 +162,21 @@ def add_watermark(video: Path, add_mask=False, crop=False):
             output = output.filter('scale', 1920, 1080)
     if output is video_input:
         return
-    extra_args = {}
-    extra_args['movflags'] = 'frag_keyframe+empty_moov+default_base_moof'
-    extra_args |= {'scodec': 'mov_text',
-                   'metadata:s:s:0': 'language=chi'} if extra_inputs else {}
+    extra_args = FFmpegMeta.KEEP_META_KWARGS.copy()
+    extra_args['movflags'] = 'frag_keyframe+empty_moov+default_base_moof+use_metadata_tags'
+    if extra_inputs:
+        extra_args |= {'scodec': 'mov_text',
+                       'metadata:s:s:0': 'language=chi'}
     command = (ffmpeg
                .output(output, video_input.audio, *extra_inputs, filename=str(dst),
                        vcodec='libx264', crf=18, preset='fast', acodec='copy',
                        **extra_args)
                ).compile()
-    console.log(f'Running: {" ".join(command)}')
-    process = subprocess.Popen(command, stderr=subprocess.PIPE, text=True)
-    for line in process.stderr:
-        line = line.strip()
-        if 'speed' in line:
-            print(line, end='\r')
-        else:
-            console.log(line, highlight=False)
-    dst2 = dst.with_stem(dst.stem+'_fixing')
-    (ffmpeg.input(filename=str(dst))
-     .output(filename=str(dst2), c='copy')
-     .run(overwrite_output=False))
-    dst2.rename(dst)
-    copy_meta(video, dst, with_sound=True)
+    print(f'Running: {" ".join(command)}')
+    with subprocess.Popen(command, stderr=subprocess.PIPE, text=True) as process:
+        for line in process.stderr:
+            line = line.strip()
+            if 'speed' in line:
+                print(line, end='\r')
+            else:
+                console.log(line, highlight=False)

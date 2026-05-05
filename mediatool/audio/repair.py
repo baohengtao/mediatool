@@ -1,96 +1,53 @@
 import itertools
+import subprocess
 from pathlib import Path
 
-import ffmpeg
 from rich.prompt import Confirm
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import copy_meta, get_stream_info, get_video_path
+from mediatool.helper import get_stream_info, get_video_path
+from mediatool.metadata import FFmpegMeta
 
 app = Typer()
 
 
-@app.command()
-def mute(video: Path, start_s: float, end_s: float):
-    mute_audio(video, start_s, end_s)
-
-
+@app.command(name='mute')
 def mute_audio(input_path: Path, start_s: float, end_s: float):
-    input = ffmpeg.input(str(input_path))
     output_path = input_path.with_stem(
         input_path.stem + f'_muted_{start_s}_{end_s}')
     if output_path.exists():
         return
+    command = ['ffmpeg', '-i', str(input_path),
+               '-af', f"volume=0:enable='between(t,{start_s},{end_s})'",
+               '-c:v', 'copy', '-c:a', 'flac', ]
+    command += FFmpegMeta.REMOVE_SOUND + [str(output_path)]
 
-    audio = input.audio
-    video = input.video
-
-    # 分段音频
-    a1 = audio.filter('atrim', start=0, end=start_s).filter(
-        'asetpts', 'PTS-STARTPTS')
-    a2 = audio.filter('atrim', start=start_s, end=end_s).filter(
-        'asetpts', 'PTS-STARTPTS').filter('volume', 0)
-    a3 = audio.filter('atrim', start=end_s).filter('asetpts', 'PTS-STARTPTS')
-
-    # 拼接音频
-    aout = ffmpeg.concat(a1, a2, a3, v=0, a=1)
-
-    ffmpeg.output(video, aout, str(output_path), vcodec='copy',
-                  acodec='flac').run(overwrite_output=True)
-    copy_meta(input_path, output_path)
+    print(f'running {' '.join(command)}')
+    subprocess.run(command, check=True)
 
 
-@app.command()
-def shift(video: Path, offset: float):
-    shift_audio(video, offset)
-
-
+@app.command(name='shift')
 def shift_audio(input_path: Path, offset: float):
-    """
-    音频偏移（正数=延后，负数=提前），保持时长一致。
-    用静音补齐，不裁剪视频。
-    输出文件会在原文件名后加 "_shifted"。
-    """
-    input = ffmpeg.input(str(input_path))
-    output_path = input_path.with_stem(input_path.stem + f'_shifted_{offset}')
+    output_path = input_path.with_stem(f"{input_path.stem}_shifted_{offset}")
     if output_path.exists():
         return
-
-    # 获取音频总时长
-    probe = ffmpeg.probe(str(input_path))
-    duration = float(
-        next(s for s in probe["streams"] if s["codec_type"] == "audio")["duration"])
-
     if offset > 0:
-        # 延迟：前面补静音（原音频片段 volume=0）
-        patch = input.audio.filter('atrim', start=0, end=offset).filter(
-            'volume', 0).filter('asetpts', 'PTS-STARTPTS')
-        main = input.audio.filter(
-            'atrim', start=0, end=duration - offset).filter('asetpts', 'PTS-STARTPTS')
-        shifted_audio = ffmpeg.concat(patch, main, v=0, a=1)
+        # Delaying: adelay takes milliseconds. 1.5s -> 1500ms
+        ms = int(offset * 1000)
+        audio_filter = f"adelay={ms}:all=1"
     elif offset < 0:
-        # 提前：结尾补静音（原音频片段 volume=0）
+        # Advancing: trim the start, then pad the end with silence
         abs_off = abs(offset)
-        main = input.audio.filter('atrim', start=abs_off, end=duration).filter(
-            'asetpts', 'PTS-STARTPTS')
-        patch = input.audio.filter('atrim', start=duration - abs_off,
-                                   end=duration).filter('volume', 0).filter('asetpts', 'PTS-STARTPTS')
-        shifted_audio = ffmpeg.concat(main, patch, v=0, a=1)
+        audio_filter = f"atrim=start={abs_off},asetpts=PTS-STARTPTS"
     else:
-        shifted_audio = input.audio
-
-    kwargs = {'c:v': 'copy', 'c:a': 'flac'}
-
-    # 输出视频 + 调整后的音频，视频流直接拷贝
-    (
-        ffmpeg
-        .output(input.video, shifted_audio, filename=str(output_path), **kwargs)
-        .run(overwrite_output=True)
-    )
-    copy_meta(input_path, output_path, with_sound=True)
-
-    return output_path
+        return
+    cmd = ['ffmpeg', '-i', str(input_path), '-af', audio_filter,
+           '-map', '0:v', '-map', 'a',
+           '-c:v', 'copy', '-c:a', 'flac', '-shortest']
+    cmd += FFmpegMeta.KEEP_META + [str(output_path)]
+    print(f'running command {' '.join(cmd)}')
+    subprocess.run(cmd, check=True)
 
 
 @app.command()
@@ -113,17 +70,12 @@ def convert_audio_to_mono(filepath: Path):
         if not Confirm.ask(f'{dst} exist, overwrite?'):
             return
     console.log(f'fixing {filepath}')
-    command = ffmpeg.input(filename=str(filepath)).output(
-        filename=str(dst),
-        vcodec='copy',
-        acodec='flac',
-        ar='48000',
-        sample_fmt='s32',
-        ac=1
-    )
-    console.log(command.compile())
-    command.run()
-    copy_meta(filepath, dst)
+    command = ['ffmpeg', '-i', str(filepath), '-vcodec', 'copy',
+               '-acodec', 'flac', '-ac', '1',
+               '-ar', '48000', '-sample_fmt', 's32', ]
+    command += FFmpegMeta.REMOVE_SOUND + [str(dst)]
+    print(f'running {" ".join(command)}')
+    subprocess.run(command, check=True)
     console.log(f'saved to {dst}')
 
 
@@ -142,14 +94,10 @@ def fix_audio_phase(filepath: Path):
         if not Confirm.ask(f'{dst} exist. overwrite?'):
             return
     console.log(f'fixing {filepath}')
-    command = ffmpeg.input(str(filepath)).output(
-        filename=str(dst),
-        vcodec='copy',
-        acodec="flac",
-        ar='48000',
-        sample_fmt='s32',
-        af="pan=stereo|c0=c0|c1=-1*c1")
-    console.log(f'running {" ".join(command.compile())}')
-    command.run()
-    copy_meta(filepath, dst)
+    command = ['ffmpeg', '-i', str(filepath), '-vcodec', 'copy',
+               '-acodec', 'flac', '-ar', '48000',   '-sample_fmt', 's32',
+               '-af', 'pan=stereo|c0=c0|c1=-1*c1']
+    command += FFmpegMeta.REMOVE_SOUND + [str(dst)]
+    print(f'running {" ".join(command)}')
+    subprocess.run(command, check=True)
     console.log(f'saved to {dst}')

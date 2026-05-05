@@ -3,29 +3,23 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import ffmpeg
-from rich.prompt import Confirm
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import (
-    copy_meta,
-    get_stream_info, get_xmp,
-    rename_video, write_xmp
-)
-from mediatool.meta.chapter import get_chapters_text, write_chapters
+from mediatool.helper import get_stream_info, rename_video
+from mediatool.meta.chapter import get_chapters_text
+from mediatool.metadata import convert_xmp_to_metadata, get_metadata_args
 
 app = Typer()
 
 
 @app.command()
 def concat(paths: list[Path]):
-    copy_meta = Confirm.ask('copy meta?')
     for path in paths:
-        concat_ts(path, copy_meta=copy_meta)
+        concat_ts(path)
 
 
-def concat_ts(path: Path, copy_meta: bool = False) -> Path | None:
+def concat_ts(path: Path) -> Path | None:
     if not path.is_dir():
         return
     suffixs = ['.mp4', '.ts', '.mkv']
@@ -44,10 +38,21 @@ def concat_ts(path: Path, copy_meta: bool = False) -> Path | None:
     text = '\n'.join(f"file '{video.absolute()}'" for video in videos)
     filelist = path/'filelist.txt'
     filelist.write_text(text)
-    output = (ffmpeg.input(str(filelist), format='concat', safe=0, fflags='+genpts+discardcorrupt')
-              .output(filename=str(merged), c='copy', map=0))
-    command = output.compile()
-    console.log(f'Running: {command}')
+    command = ['ffmpeg', '-fflags', '+genpts+discardcorrupt', '-i', str(videos[0]),  '-f', 'concat',
+               '-safe', '0', '-i', str(filelist)]
+    if len(videos) > 1:
+        chapters_file = videos[0].with_name('chapters.txt')
+        chapters_file.write_text(get_chapters_text(videos))
+        command += ['-i', str(chapters_file), '-map_chapters', '2']
+
+    meta_info = {}
+    if (xmp_file := path / 'xmp.json').exists():
+        meta_info = json.loads(xmp_file.read_text())
+        assert meta_info.pop('Rotation', 0) == 0
+        meta_info = convert_xmp_to_metadata(meta_info)
+    command += get_metadata_args(meta_info, keep_sound=False)
+    command += ['-c', 'copy', '-map', '1', str(merged)]
+    print(f'Running: {' '.join(command)}')
     process = subprocess.Popen(command, stderr=subprocess.PIPE, text=True)
     for line in process.stderr:
         line = line.strip()
@@ -55,18 +60,6 @@ def concat_ts(path: Path, copy_meta: bool = False) -> Path | None:
             print(line, end='\r')
         else:
             console.log(line, highlight=False)
-
-    if len(videos) > 1:
-        chapters_text = get_chapters_text(videos)
-        tmp = write_chapters(chapters_text, merged)
-        tmp.rename(merged)
-
-    if (xmp_file := path / 'xmp.json').exists():
-        xmp_info = json.loads(xmp_file.read_text())
-    else:
-        xmp_info = get_xmp(videos[0]) if copy_meta else {}
-
-    write_xmp(merged, xmp_info)
     return rename_video(merged)
 
 
@@ -139,19 +132,21 @@ def fix_ts_single(path: Path, to_ts: bool = False, flac: bool = False):
     if path.name.endswith('_fixed'):
         console.log(f'{path} already fixed, skip...')
         return
-    new_path = path.with_name(path.name+'_fixed')
-    if new_path.exists():
-        console.log(f'{new_path} already exist, skip...')
-        return
+    if (new_path := path.with_name(path.name+'_fixed')).exists():
+        if new_path.is_file() or list(new_path.iterdir()):
+            console.log(f'{new_path} already exist, skip...')
+            return
     if path.is_file():
         new_path = path.parent
     else:
-        new_path.mkdir()
-    xmp, rotation = {}, 0
+        new_path.mkdir(exist_ok=True)
+    meta_info, rotation = {}, 0
     if (xmp_file := path/'xmp.json').exists():
-        xmp = json.loads(xmp_file.read_text())
+        meta_info = json.loads(xmp_file.read_text())
         if not to_ts:
-            rotation = xmp.pop('Rotation', 0)
+            rotation = meta_info.pop('Rotation', 0)
+            rotation = (360-rotation) % 360
+        meta_info = convert_xmp_to_metadata(meta_info)
     files = sorted(path.iterdir()) if path.is_dir() else [path]
     for video in sorted(files):
         if video.name in ['.DS_Store', 'xmp.json']:
@@ -179,19 +174,21 @@ def fix_ts_single(path: Path, to_ts: bool = False, flac: bool = False):
             else:
                 args |= {'bsf:a': 'aac_adtstoasc'}
             new_video = new_path / f'{video.stem}_fixed{suf}'
-            command = (ffmpeg.input(filename=str(video), probesize='50M', analyzeduration='100M',
-                                    fflags='+genpts+discardcorrupt',
-                                    err_detect='ignore_err')
-                       .output(filename=str(new_video),  map=0, **args))
-            print(f'running {" ".join(command.compile())}')
-            command.run(overwrite_output=False)
+            command = [
+                'ffmpeg',
+                '-probesize', '50M', '-analyzeduration', '100M',
+                '-fflags', '+genpts+discardcorrupt',
+                '-err_detect', 'ignore_err',]
             if rotation:
-                write_xmp(new_video, {'Rotation': rotation})
-            copy_meta(video, new_video, with_sound=True)
+                command += ['-display_rotation:v:0', str(rotation)]
+            command += ['-i', str(video)]
+            for k, v in args.items():
+                command += [f'-{k}', str(v)]
+            command += get_metadata_args(meta_info, keep_sound=True)
+            command += ['-map', '0', str(new_video)]
+            print(f'running {" ".join(command)}')
+            subprocess.run(command, check=True)
             rename_video(new_video)
         else:
             assert video.suffix in ['.json', '.log', '.txt']
             shutil.copy2(video, new_path/video.name)
-    if xmp:
-        (new_path/'xmp.json').write_text(json.dumps(
-            xmp, ensure_ascii=False, indent=2))

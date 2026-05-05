@@ -10,15 +10,9 @@ from rich.prompt import Prompt
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import (
-    copy_meta,
-    get_stream_info,
-    get_video_path, get_xmp,
-    rename_video,
-    timestr_to_secs, write_xmp
-)
+from mediatool.helper import get_video_path, rename_video, timestr_to_secs
+from mediatool.metadata import FFmpegMeta, read_metadata, write_metadata
 
-# Target -1.5 dBTP: Safe peak level to prevent clipping after platform transcoding.
 TARGET_TP = -2.0
 
 
@@ -26,8 +20,8 @@ app = Typer()
 
 
 def check_normalized(filepath: Path) -> bool:
-    meta = get_xmp(filepath, with_sound=True)
-    if stats := meta.get('QuickTime:Information'):
+    meta = read_metadata(filepath, with_sound=True)
+    if stats := meta.get('loudnorm'):
         stats = json.loads(stats)
         volume = float(stats['input_i'])
         if float(stats['input_tp']) < 0 and -16.5 < volume < -15:
@@ -46,21 +40,17 @@ def loudness(paths: list[Path]):
 
 
 def get_loudness_stats(input_filepath: Path) -> dict:
-    meta = get_xmp(input_filepath, with_sound=True)
-    if stats := meta.get('QuickTime:Information'):
+    meta = read_metadata(input_filepath, with_sound=True)
+    if stats := meta.get('loudnorm'):
         stats = json.loads(stats)
         loudness = stats['input_i']
         target = f'{float(loudness):.1f}LUFS'
-        if (volume := meta['XMP:Volume']) != target:
+        if (volume := meta['loudness']) != target:
             console.log(f'{volume}!={target}', style='error')
-            write_xmp(input_filepath, {'XMP:Volume': target})
+            write_metadata(input_filepath, {'loudness': target})
         return stats
-    command = (
-        ffmpeg
-        .input(str(input_filepath))
-        .output('-', format='null', af="loudnorm=print_format=json", vn=None, sn=None)
-        .compile()
-    )
+    command = ['ffmpeg', '-i', str(input_filepath), '-f', 'null',
+               '-af', 'loudnorm=print_format=json', '-sn', '-vn', '-']
     process = subprocess.Popen(
         command,
         stderr=subprocess.PIPE,
@@ -68,7 +58,6 @@ def get_loudness_stats(input_filepath: Path) -> dict:
         text=True
     )
     console.log(f'\nrunning {" ".join(command)}', highlight=False)
-
     all_stderr_lines = []
     for line in process.stderr:
         all_stderr_lines.append(line)
@@ -78,19 +67,17 @@ def get_loudness_stats(input_filepath: Path) -> dict:
         else:
             highlight = '"' in line
             console.log(line, highlight=highlight)
-
     process.wait()
-
     full_stderr_str = "".join(all_stderr_lines)
     i = full_stderr_str.rfind("{")
     j = full_stderr_str.rfind("}")
     stats_dict = json.loads(full_stderr_str[i: j + 1])
     loudness = stats_dict['input_i']
     volume = f'{float(loudness):.1f}LUFS'
-    meta = {'XMP:Volume': volume,
-            'QuickTime:Information': json.dumps(stats_dict)
+    meta = {'loudness': volume,
+            'loudnorm': json.dumps(stats_dict)
             }
-    write_xmp(input_filepath, meta)
+    write_metadata(input_filepath, meta)
     return stats_dict
 
 
@@ -106,7 +93,6 @@ def normalize(path: Path, target_i: float = None, tp: float = None,
             for future in done_futures:
                 inflight.pop(future)
                 future.result()
-
             for video in get_video_path(path):
                 if video in seen:
                     continue
@@ -167,12 +153,8 @@ def normalize_volume(filepath: Path, target_i: float = None, tp: float = None,
         first_pass = False
 
 
-@app.command()
-def normalize_partial(path: Path, linear: bool = False):
-    normalize_volume_partial(path, linear)
-
-
-def normalize_volume_partial(video_path: Path, linear: bool):
+@app.command('normalize-partial')
+def normalize_volume_partial(video_path: Path, linear: bool = False):
     normalize_info = video_path.with_name(f'{video_path.stem}.txt')
     if normalize_info.exists():
         segs = normalize_info.read_text().split()
@@ -192,12 +174,12 @@ def normalize_volume_partial(video_path: Path, linear: bool):
         audios = []
     for i in range(len(segs)-1):
         partial = video_path.with_stem(video_path.stem+f'_part_{i+1:02d}')
-        command = (ffmpeg.input(video_path)
-                   .output(filename=partial,
-                           vn=None, acodec='copy',
-                           ss=segs[i], to=segs[i+1]))
-        print(command.compile())
-        command.run()
+        command = [
+            'ffmpeg', '-i', str(video_path),
+            '-ss', str(segs[i]), '-to', str(segs[i+1]),
+            '-vn', '-acodec', 'copy', str(partial)]
+        print(" ".join(command))
+        subprocess.run(command, check=True)
         partial = normalize_volume(partial, linear=linear)
         audios.append(ffmpeg.input(partial).audio)
     audios.append(inp.audio.filter('atrim', start=segs[-1]))
@@ -206,61 +188,38 @@ def normalize_volume_partial(video_path: Path, linear: bool):
     out_audio = ffmpeg.concat(*audios, v=0, a=1)
     stem = f"{video_path.stem}_pnorm_{'linear' if linear else 'dynamic'}"
     output_file = video_path.with_stem(stem)
-    (
-        ffmpeg
-        .output(inp.video, out_audio, filename=output_file, vcodec='copy', acodec='flac')
-        .run()
-    )
-    copy_meta(video_path, output_file)
+    (ffmpeg.output(inp.video, out_audio, filename=output_file, vcodec='copy', acodec='flac',
+                   **FFmpegMeta.REMOVE_SOUND_KWARGS).run())
     get_loudness_stats(output_file)
-    return output_file
 
 
 def apply_loudness_normalization(input_filepath: Path, output_filepath: Path,
                                  measured_stats, target_i, tp=None, lra=None,
                                  linear=True):
-    input_stream = ffmpeg.input(str(input_filepath))
-    audio_input_stream = input_stream.audio
-    video_input_stream = input_stream.video
     lra = float(lra or measured_stats['input_lra'])
     if not linear:
         lra = min(lra, 10)
     tp = float(tp or TARGET_TP)
 
-    audio_normalized_stream = audio_input_stream.filter(
-        'loudnorm',
-        I=str(target_i),
-        TP=tp,
-        LRA=lra,
-        measured_I=measured_stats['input_i'],
-        measured_LRA=measured_stats['input_lra'],
-        measured_TP=measured_stats['input_tp'],
-        measured_thresh=measured_stats['input_thresh'],
-        offset=measured_stats['target_offset'],
-        linear='true' if linear else 'false',
-        print_format='json'
-    )
-
-    if not get_stream_info(input_filepath).get('video'):
-        command = ffmpeg.output(
-            audio_normalized_stream,
-            filename=str(output_filepath),
-            acodec='flac',
-            ar='48000',
-            sample_fmt='s32'
-        ).compile()
-    else:
-        command = ffmpeg.output(
-            video_input_stream,
-            audio_normalized_stream,
-            filename=str(output_filepath),
-            vcodec='copy',
-            acodec='flac',
-            ar='48000',
-            sample_fmt='s32',
-            scodec='copy',   # <--- keep subtitles
-            map='0:s?'       # <--- include subtitle stream if exists
-        ).compile()
+    loudnorm_opts = [
+        f"I={target_i}",
+        f"TP={tp}",
+        f"LRA={lra}",
+        f"measured_I={measured_stats['input_i']}",
+        f"measured_LRA={measured_stats['input_lra']}",
+        f"measured_TP={measured_stats['input_tp']}",
+        f"measured_thresh={measured_stats['input_thresh']}",
+        f"offset={measured_stats['target_offset']}",
+        f"linear={'true' if linear else 'false'}",
+        "print_format=json"
+    ]
+    filter_string = f"loudnorm={':'.join(loudnorm_opts)}"
+    command = ["ffmpeg", "-i", str(input_filepath),
+               "-af", filter_string,
+               "-vcodec", "copy", "-scodec", "copy",
+               "-map", "0:v?", "-map", "0:a:0", "-map", "0:s?",
+               "-acodec", "flac", "-ar", "48000", "-sample_fmt", "s32"]
+    command += FFmpegMeta.REMOVE_SOUND+[str(output_filepath)]
     console.log(f'\nrunning {" ".join(command)}', highlight=False)
     process = subprocess.Popen(command, stderr=subprocess.PIPE, text=True)
     for line in process.stderr:
@@ -272,4 +231,3 @@ def apply_loudness_normalization(input_filepath: Path, output_filepath: Path,
             console.log(line, highlight=highlight)
     if not output_filepath.exists():
         raise ValueError(f'normalize {input_filepath} failed!')
-    copy_meta(input_filepath, output_filepath)

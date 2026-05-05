@@ -8,12 +8,8 @@ import pendulum
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import (
-    copy_meta,
-    get_stream_info,
-    get_video_path,
-    rename_video
-)
+from mediatool.helper import get_stream_info, get_video_path, rename_video
+from mediatool.metadata import FFmpegMeta
 
 app = Typer()
 
@@ -73,18 +69,12 @@ def write_chapters(chapters_text, video_path: Path) -> Path:
     final_path = video_path.with_stem(video_path.stem+'_with_chapter')
     if final_path.exists():
         raise ValueError(f'{final_path} already exist')
-    command = ['ffmpeg', '-i', str(video_path),
-               '-i', str(chapters_file), '-map', '0',
-               '-map_chapters', '1', '-c', 'copy',
-               str(final_path)]
-    console.log(f'Running: {" ".join(command)}')
-    process = subprocess.Popen(command, stderr=subprocess.PIPE, text=True)
-    for line in process.stderr:
-        line = line.strip()
-        if 'speed' in line:
-            print(line, end='\r')
-        else:
-            console.log(line, highlight=False)
+    command = ['ffmpeg', '-i', str(video_path), '-i', str(chapters_file),
+               '-map', '0', '-map_chapters', '1']
+    command += FFmpegMeta.KEEP_META
+    command += ['-c', 'copy', str(final_path)]
+    print(f'Running: {" ".join(command)}')
+    subprocess.run(command, check=True)
     return final_path
 
 
@@ -98,33 +88,11 @@ def remove_chapter(paths: list[Path]):
 
 def remove_chapter_single(video_path: Path):
     dst = video_path.with_stem(video_path.stem+'_no_chpt')
-    ffmpeg.input(str(video_path)).output(
-        filename=dst,
-        map_chapters=-1,
-        c='copy'
-    ).run()
-
-
-@app.command()
-def singlify_chapter(paths: list[Path]):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in sorted(paths))
-    for video in videos:
-        singlify_chapter_single(video)
-
-
-def singlify_chapter_single(video_path: Path):
-    vinfo = get_stream_info(video_path)
-    if len(vinfo['chapters']) <= 1:
-        return
-    chapters_list = [{
-        'start_time': 0,
-        'end_time': '10420.227000',
-        'tags': {'title': 'single_chapter'}}]
-    chapters_text = convert_chapters_list_to_text(chapters_list)
-    dst = write_chapters(chapters_text, video_path)
-    copy_meta(video_path, dst, with_sound=True)
-    rename_video(dst)
+    command = ['ffmpeg', '-i', str(video_path),
+               '-c', 'copy', '-map_chapters', '-1']
+    command += FFmpegMeta.KEEP_META+[str(dst)]
+    print(f'running {' '.join(command)}')
+    subprocess.run(command, check=True)
 
 
 @app.command()
@@ -146,5 +114,4 @@ def fix_chapter_single(video_path: Path):
         console.log(f'fixing {video_path}')
         chapters_text = convert_chapters_list_to_text(chapters)
         dst = write_chapters(chapters_text, video_path)
-        copy_meta(video_path, dst, with_sound=True)
         rename_video(dst)

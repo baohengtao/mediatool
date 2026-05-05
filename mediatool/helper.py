@@ -2,7 +2,6 @@
 import asyncio
 import fractions
 import itertools
-import time
 from collections import defaultdict
 from copy import deepcopy
 from functools import wraps
@@ -11,50 +10,50 @@ from typing import Iterator
 
 import ffmpeg
 import pendulum
-from exiftool import ExifToolHelper
 from rich.prompt import Confirm, Prompt
 
 from mediatool import console
+from mediatool.metadata import read_metadata, write_metadata
 
-et = ExifToolHelper()
-
-
-def get_xmp(img: Path, with_sound: bool = False):
-    if img.suffix == '.ts':
-        return {}
-    meta = et.get_metadata(img)[0]
-    xmp = {k: v for k, v in meta.items() if k.startswith('XMP:')
-           and k not in ['XMP:XMPToolkit', 'XMP:Volume']}
-    if with_sound:
-        xmp |= {k: v for k, v in meta.items() if k in [
-            'XMP:Volume', 'QuickTime:Information']}
-    return xmp
+# et = ExifToolHelper()
 
 
-def write_xmp(img: Path, tags: dict):
-    for k, v in tags.copy().items():
-        if isinstance(v, str):
-            tags[k] = v.replace('\n', '&#x0a;')
-    if not tags:
-        return
-    console.log(f'writing {tags} to {img}')
-    start_time = time.monotonic()
-    params = ['-ignoreMinorErrors', '-escapeHTML', '-overwrite_original']
-    with ExifToolHelper() as et:
-        et.set_tags(img, tags, params=params)
-    console.log(f'write meta in {time.monotonic()-start_time:.1f} seconds')
+# def get_xmp(img: Path, with_sound: bool = False):
+#     if img.suffix == '.ts':
+#         return {}
+#     meta = et.get_metadata(img)[0]
+#     xmp = {k: v for k, v in meta.items() if k.startswith('XMP:')
+#            and k not in ['XMP:XMPToolkit', 'XMP:Volume']}
+#     if with_sound:
+#         xmp |= {k: v for k, v in meta.items() if k in [
+#             'XMP:Volume', 'QuickTime:Information']}
+#     return xmp
 
 
-def copy_meta(src: Path, dst: Path, with_sound=False):
-    xmp = get_xmp(src, with_sound)
-    write_xmp(dst, xmp)
+# def write_xmp(img: Path, tags: dict):
+#     for k, v in tags.copy().items():
+#         if isinstance(v, str):
+#             tags[k] = v.replace('\n', '&#x0a;')
+#     if not tags:
+#         return
+#     console.log(f'writing {tags} to {img}')
+#     start_time = time.monotonic()
+#     params = ['-ignoreMinorErrors', '-escapeHTML', '-overwrite_original']
+#     with ExifToolHelper() as et:
+#         et.set_tags(img, tags, params=params)
+#     console.log(f'write meta in {time.monotonic()-start_time:.1f} seconds')
+
+
+# def copy_meta(src: Path, dst: Path, with_sound=False):
+#     xmp = get_xmp(src, with_sound)
+#     write_xmp(dst, xmp)
 
 
 def rename_video(video: Path, fix=False, change_artist=False, change_title=False) -> Path:
-    meta = get_xmp(video, with_sound=True)
-    created_at = meta.get('XMP:DateCreated')
-    title = meta.get('XMP:Title', '')
-    artist = meta.get('XMP:Artist', '')
+    meta = read_metadata(video, with_sound=True)
+    created_at = meta.get('creation_time')
+    title = meta.get('title', '')
+    artist = meta.get('artist', '')
     if artist and change_artist:
         if Confirm.ask(f'current artist of {video} is {artist}, change?'):
             artist = ''
@@ -64,31 +63,32 @@ def rename_video(video: Path, fix=False, change_artist=False, change_title=False
             title = ''
             fix = True
     while fix and not (title and created_at and artist):
-        xmp = {}
+        meta = {}
         if not created_at:
-            xmp['XMP:DateCreated'] = created_at = Prompt.ask(
+            meta['creation_time'] = created_at = Prompt.ask(
                 f'Enter the DateCreated of {video}').strip()
         if not artist:
-            xmp['XMP:Artist'] = artist = Prompt.ask(
+            meta['artist'] = artist = Prompt.ask(
                 f'Enter the artist of {video}').strip()
 
         if not title:
-            xmp['XMP:Title'] = title = Prompt.ask(
+            meta['title'] = title = Prompt.ask(
                 f'Enter the title of {video}').strip()
-        xmp = {k: v for k, v in xmp.items() if v != ''}
-        if xmp:
-            write_xmp(video, xmp)
+        meta = {k: v for k, v in meta.items() if v != ''}
+        if meta:
+            write_metadata(video, meta)
         if title and artist:
             break
     if created_at:
-        created_at = pendulum.from_format(created_at, 'YYYY:MM:DD HH:mm:ss')
+        created_at = pendulum.from_format(
+            created_at, 'YYYY-MM-DD[T]HH:mm:ssZZ')
     try:
         vinfo = get_stream_info(video)['vinfo']
     except ValueError:
         suffix = '_error_get_vinfo'
     else:
         suffix = vinfo['suffix']
-    volume = meta.get('XMP:Volume', '')
+    volume = meta.get('loudness', '')
     assert isinstance(volume, str)
 
     for inc in itertools.count():
@@ -158,7 +158,7 @@ def get_video_path(path: Path) -> Iterator[Path]:
     yield from sorted(files)
 
 
-def get_stream_info(video_path):
+def get_stream_info(video_path) -> dict[str]:
     if not isinstance(video_path, dict):
         info = ffmpeg.probe(video_path, show_chapters=None)
     else:
@@ -175,7 +175,7 @@ def get_stream_info(video_path):
     streams['chapters'] = info.pop('chapters')
     streams['format'] = info.pop('format')
     assert not info
-    streams = dict(streams.items())
+    streams: dict[str] = dict(streams.items())
     for k in ['video', 'audio']:
         if (x := len(streams.get(k, []))) > 1:
             console.log(f'{x} {k} streams found', style='error')
@@ -208,7 +208,7 @@ def parse_stream(streams):
         (video_info['height'], video_info['width']))
 
     suffix = [vinfo['bit_rate']]
-    chapters = vinfo['chapters']
+    chapters: list = vinfo['chapters']
     if (chp_cnt := len(chapters)) > 1:
         if vinfo['duration'] < float(chapters[-1]['start_time']):
             console.log(
