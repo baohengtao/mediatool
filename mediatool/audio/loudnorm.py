@@ -52,6 +52,7 @@ def get_loudness_stats(input_filepath: Path) -> dict:
         command,
         stderr=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
+        errors='replace',
         text=True
     )
     console.log(f'\nrunning {" ".join(command)}', highlight=False)
@@ -218,7 +219,8 @@ def apply_loudness_normalization(input_filepath: Path, output_filepath: Path,
                "-acodec", "flac", "-ar", "48000", "-sample_fmt", "s32"]
     command += FFmpegMeta.REMOVE_SOUND+[str(output_filepath)]
     console.log(f'\nrunning {" ".join(command)}', highlight=False)
-    process = subprocess.Popen(command, stderr=subprocess.PIPE, text=True)
+    process = subprocess.Popen(command, stderr=subprocess.PIPE,
+                               text=True, errors='replace')
     for line in process.stderr:
         line = line.strip()
         if 'speed' in line:

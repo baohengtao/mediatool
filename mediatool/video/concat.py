@@ -53,7 +53,8 @@ def concat_ts(path: Path) -> Path | None:
     command += get_metadata_args(meta_info, keep_sound=False)
     command += ['-c', 'copy', '-map', '1', str(merged)]
     print(f'Running: {' '.join(command)}')
-    process = subprocess.Popen(command, stderr=subprocess.PIPE, text=True)
+    process = subprocess.Popen(command, stderr=subprocess.PIPE,
+                               text=True, errors='replace')
     for line in process.stderr:
         line = line.strip()
         if 'speed' in line:
@@ -172,7 +173,7 @@ def fix_ts(path: Path, to_ts: bool = False, flac: bool = False):
             new_video = new_path / f'{video.stem}_fixed{suf}'
             command = [
                 'ffmpeg',
-                '-probesize', '50M', '-analyzeduration', '100M',
+                '-probesize', '150M', '-analyzeduration', '300M',
                 '-fflags', '+genpts+discardcorrupt',
                 '-err_detect', 'ignore_err',]
             if rotation:

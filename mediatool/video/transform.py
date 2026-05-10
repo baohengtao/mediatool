@@ -168,7 +168,7 @@ def add_watermark(video: Path, add_mask=False, crop=False):
                        **extra_args)
                ).compile()
     print(f'Running: {" ".join(command)}')
-    with subprocess.Popen(command, stderr=subprocess.PIPE, text=True) as process:
+    with subprocess.Popen(command, stderr=subprocess.PIPE, text=True, errors='replace') as process:
         for line in process.stderr:
             line = line.strip()
             if 'speed' in line:
