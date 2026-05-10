@@ -41,38 +41,6 @@ def batch_processor(recursive: bool = True):
         }
         return wrapper
     return decorator
-# et = ExifToolHelper()
-
-
-# def get_xmp(img: Path, with_sound: bool = False):
-#     if img.suffix == '.ts':
-#         return {}
-#     meta = et.get_metadata(img)[0]
-#     xmp = {k: v for k, v in meta.items() if k.startswith('XMP:')
-#            and k not in ['XMP:XMPToolkit', 'XMP:Volume']}
-#     if with_sound:
-#         xmp |= {k: v for k, v in meta.items() if k in [
-#             'XMP:Volume', 'QuickTime:Information']}
-#     return xmp
-
-
-# def write_xmp(img: Path, tags: dict):
-#     for k, v in tags.copy().items():
-#         if isinstance(v, str):
-#             tags[k] = v.replace('\n', '&#x0a;')
-#     if not tags:
-#         return
-#     console.log(f'writing {tags} to {img}')
-#     start_time = time.monotonic()
-#     params = ['-ignoreMinorErrors', '-escapeHTML', '-overwrite_original']
-#     with ExifToolHelper() as et:
-#         et.set_tags(img, tags, params=params)
-#     console.log(f'write meta in {time.monotonic()-start_time:.1f} seconds')
-
-
-# def copy_meta(src: Path, dst: Path, with_sound=False):
-#     xmp = get_xmp(src, with_sound)
-#     write_xmp(dst, xmp)
 
 
 def rename_video(video: Path, fix=False, change_artist=False, change_title=False) -> Path:
