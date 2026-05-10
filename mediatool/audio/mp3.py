@@ -1,4 +1,3 @@
-import itertools
 import subprocess
 from pathlib import Path
 
@@ -29,9 +28,7 @@ def flac2m4a(audios: list[Path]):
 
 @app.command()
 def to_audio(paths: list[Path]):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in paths)
-    for video in videos:
+    for video in get_video_path(paths):
         convert_video_to_m4a(video)
 
 

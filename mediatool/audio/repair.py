@@ -1,4 +1,3 @@
-import itertools
 import subprocess
 from pathlib import Path
 
@@ -52,9 +51,7 @@ def shift_audio(input_path: Path, offset: float):
 
 @app.command()
 def mono(paths: list[Path]):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in paths)
-    for video in videos:
+    for video in get_video_path(paths):
         convert_audio_to_mono(video)
 
 
@@ -81,9 +78,7 @@ def convert_audio_to_mono(filepath: Path):
 
 @app.command()
 def fix_phase(paths: list[Path]):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in paths)
-    for video in videos:
+    for video in get_video_path(paths):
         fix_audio_phase(video)
 
 

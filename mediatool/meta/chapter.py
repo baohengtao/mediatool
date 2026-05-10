@@ -1,4 +1,3 @@
-import itertools
 import re
 import subprocess
 from pathlib import Path
@@ -80,9 +79,7 @@ def write_chapters(chapters_text, video_path: Path) -> Path:
 
 @app.command()
 def remove_chapter(paths: list[Path]):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in sorted(paths))
-    for video in videos:
+    for video in get_video_path(paths):
         remove_chapter_single(video)
 
 
@@ -97,9 +94,7 @@ def remove_chapter_single(video_path: Path):
 
 @app.command()
 def fix_chapter(paths: list[Path]):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in sorted(paths))
-    for video in videos:
+    for video in get_video_path(paths):
         fix_chapter_single(video)
 
 

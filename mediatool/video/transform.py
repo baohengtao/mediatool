@@ -1,4 +1,3 @@
-import itertools
 import json
 import subprocess
 from collections import defaultdict
@@ -17,9 +16,7 @@ app = Typer()
 
 @app.command()
 def to_h264(paths: list[Path]):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in sorted(paths))
-    for video in videos:
+    for video in get_video_path(paths):
         convert_to_h264(video)
 
 
@@ -101,9 +98,7 @@ def reencoding_video(target_video: Path,  reference_video: Path = None):
 
 @app.command()
 def watermark(paths: list[Path], add_mask: bool = False, crop: bool = False):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in paths)
-    for video in videos:
+    for video in get_video_path(paths):
         add_watermark(video, add_mask=add_mask, crop=crop)
 
 

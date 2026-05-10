@@ -1,4 +1,3 @@
-import itertools
 import json
 import subprocess
 import time
@@ -31,9 +30,7 @@ def check_normalized(filepath: Path) -> bool:
 
 @app.command()
 def loudness(paths: list[Path]):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in sorted(paths))
-    for video in videos:
+    for video in get_video_path(paths):
         console.rule(f"processing {video}")
         get_loudness_stats(video)
         rename_video(video)

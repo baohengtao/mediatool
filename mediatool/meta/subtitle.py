@@ -1,4 +1,3 @@
-import itertools
 import json
 import re
 import subprocess
@@ -132,9 +131,7 @@ def dual(upper_srt: Path, down_srt: Path):
 @app.command()
 def extract(paths: list[Path]):
     """extract subtitles from video"""
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in paths)
-    for video in videos:
+    for video in get_video_path(paths):
         get_subtitles(video)
 
 
@@ -196,9 +193,7 @@ def get_subtitles(video: Path):
 @app.command()
 def embed(paths: list[Path]):
     """embed subtitles to video"""
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in paths)
-    for video in videos:
+    for video in get_video_path(paths):
         add_subtitles(video)
 
 

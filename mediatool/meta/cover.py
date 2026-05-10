@@ -1,4 +1,3 @@
-import itertools
 import subprocess
 from fractions import Fraction
 from pathlib import Path
@@ -19,9 +18,7 @@ app = Typer()
 @app.command()
 @run_async
 async def cover(paths: list[Path], use_ffmpeg: bool = False):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in paths)
-    for video in videos:
+    for video in get_video_path(paths):
         await write_cover(video, use_ffmepg=use_ffmpeg)
 
 

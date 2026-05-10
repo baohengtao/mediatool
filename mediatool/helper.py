@@ -6,7 +6,7 @@ from collections import defaultdict
 from copy import deepcopy
 from functools import wraps
 from pathlib import Path
-from typing import Iterator
+from typing import Generator
 
 import ffmpeg
 import pendulum
@@ -134,7 +134,11 @@ def timestr_to_secs(timestr: str):
     return sum(float(x)*60**i for i, x in enumerate(timestr[::-1]))
 
 
-def get_video_path(path: Path) -> Iterator[Path]:
+def get_video_path(path: Path | list[Path]) -> Generator[Path]:
+    if isinstance(path, list):
+        for p in sorted(path):
+            yield from get_video_path(p)
+        return
     if not path.exists():
         console.log(f'{path} not exist', style='error')
         return

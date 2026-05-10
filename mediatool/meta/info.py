@@ -1,4 +1,3 @@
-import itertools
 import json
 from pathlib import Path
 
@@ -14,17 +13,13 @@ app = Typer()
 
 @app.command(name='fix-meta')
 def fix_meta_command(paths: list[Path]):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in sorted(paths))
-    for video in videos:
+    for video in get_video_path(paths):
         fix_meta(video)
 
 
 @app.command()
 def print_info(paths: list[Path]):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in sorted(paths))
-    for video in videos:
+    for video in get_video_path(paths):
         vinfo = ffmpeg.probe(video, show_chapters=None)
         chapters = []
         for c in vinfo.pop('chapters', []):
@@ -42,7 +37,5 @@ def print_info(paths: list[Path]):
 
 @app.command()
 def rename(paths: list[Path], fix: bool = False, change_artist: bool = False, change_title: bool = False):
-    videos = itertools.chain.from_iterable(
-        get_video_path(p) for p in sorted(paths))
-    for video in videos:
+    for video in get_video_path(paths):
         rename_video(video, fix, change_artist, change_title)

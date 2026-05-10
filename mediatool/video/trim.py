@@ -1,4 +1,3 @@
-import itertools
 import re
 import subprocess
 from pathlib import Path
@@ -28,8 +27,7 @@ app = Typer()
 
 @app.command()
 def split(input_files: list[Path], change_artist: bool = False):
-    input_files = list(itertools.chain.from_iterable(
-        get_video_path(p) for p in sorted(input_files)))
+    input_files = list(get_video_path(input_files))
     input_files.sort(key=lambda x: hanzi_sort_key(x.name))
     for input_file in input_files:
         split_video(input_file, change_artist)
