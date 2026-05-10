@@ -7,7 +7,7 @@ import pendulum
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import get_stream_info, get_video_path, rename_video
+from mediatool.helper import batch_processor, get_stream_info, rename_video
 from mediatool.metadata import FFmpegMeta
 
 app = Typer()
@@ -78,12 +78,8 @@ def write_chapters(chapters_text, video_path: Path) -> Path:
 
 
 @app.command()
-def remove_chapter(paths: list[Path]):
-    for video in get_video_path(paths):
-        remove_chapter_single(video)
-
-
-def remove_chapter_single(video_path: Path):
+@batch_processor()
+def remove_chapter(video_path: Path):
     dst = video_path.with_stem(video_path.stem+'_no_chpt')
     command = ['ffmpeg', '-i', str(video_path),
                '-c', 'copy', '-map_chapters', '-1']
@@ -93,12 +89,8 @@ def remove_chapter_single(video_path: Path):
 
 
 @app.command()
-def fix_chapter(paths: list[Path]):
-    for video in get_video_path(paths):
-        fix_chapter_single(video)
-
-
-def fix_chapter_single(video_path: Path):
+@batch_processor()
+def fix_chapter(video_path: Path):
     vinfo = get_stream_info(video_path)
     chapters, duration = vinfo['chapters'],  float(vinfo['format']['duration'])
     flag = False

@@ -1,12 +1,12 @@
-
 import asyncio
 import fractions
+import inspect
 import itertools
 from collections import defaultdict
 from copy import deepcopy
 from functools import wraps
 from pathlib import Path
-from typing import Generator
+from typing import Any, Generator
 
 import ffmpeg
 import pendulum
@@ -15,6 +15,32 @@ from rich.prompt import Confirm, Prompt
 from mediatool import console
 from mediatool.metadata import read_metadata, write_metadata
 
+
+def batch_processor(recursive: bool = True):
+    def decorator(func):
+        def wrapper(paths: list[Path], *args: Any, **kwargs: Any):
+            if recursive:
+                paths = get_video_path(paths)
+            for video in paths:
+                func(video, *args, **kwargs)
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper.__module__ = func.__module__
+        orig_sig = inspect.signature(func)
+        params = list(orig_sig.parameters.values())
+        old_name = params[0].name
+        params[0] = inspect.Parameter(
+            'paths',
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=list[Path]
+        )
+        wrapper.__signature__ = orig_sig.replace(parameters=params)
+        wrapper.__annotations__ = {
+            'paths': list[Path],
+            **{k: v for k, v in func.__annotations__.items() if k not in (old_name, 'return')}
+        }
+        return wrapper
+    return decorator
 # et = ExifToolHelper()
 
 

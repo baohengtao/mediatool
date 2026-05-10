@@ -6,7 +6,7 @@ from pathlib import Path
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import get_stream_info, rename_video
+from mediatool.helper import batch_processor, get_stream_info, rename_video
 from mediatool.meta.chapter import get_chapters_text
 from mediatool.metadata import convert_xmp_to_metadata, get_metadata_args
 
@@ -123,12 +123,8 @@ def generate_transition(
 
 
 @app.command()
-def fix_ts(paths: list[Path], to_ts: bool = False, flac: bool = False):
-    for path in paths:
-        fix_ts_single(path, to_ts, flac)
-
-
-def fix_ts_single(path: Path, to_ts: bool = False, flac: bool = False):
+@batch_processor(recursive=False)
+def fix_ts(path: Path, to_ts: bool = False, flac: bool = False):
     if path.name.endswith('_fixed'):
         console.log(f'{path} already fixed, skip...')
         return

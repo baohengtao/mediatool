@@ -15,7 +15,7 @@ from rich.prompt import Confirm, Prompt
 from typer import Typer
 
 from mediatool import DATA_PATH, console
-from mediatool.helper import get_stream_info, get_video_path
+from mediatool.helper import batch_processor, get_stream_info
 from mediatool.metadata import FFmpegMeta
 
 app = Typer()
@@ -128,14 +128,10 @@ def dual(upper_srt: Path, down_srt: Path):
     merged_subs.save(output_file, encoding='utf-8')
 
 
-@app.command()
-def extract(paths: list[Path]):
-    """extract subtitles from video"""
-    for video in get_video_path(paths):
-        get_subtitles(video)
-
-
+@app.command(name='extract')
+@batch_processor()
 def get_subtitles(video: Path):
+    """extract subtitles from video"""
     subtitles = get_stream_info(video)['subtitle']
     codec_ext_map = {
         'subrip': 'srt',
@@ -190,14 +186,10 @@ def get_subtitles(video: Path):
             print(f"Extracted {output_file}")
 
 
-@app.command()
-def embed(paths: list[Path]):
-    """embed subtitles to video"""
-    for video in get_video_path(paths):
-        add_subtitles(video)
-
-
+@app.command(name='embed')
+@batch_processor()
 def add_subtitles(video: Path):
+    """embed subtitles to video"""
     dst = video.with_stem(video.stem+'_with_subs')
     if dst.exists():
         console.log(f'{dst} exist, skip...')
@@ -245,12 +237,8 @@ def add_subtitles(video: Path):
     subprocess.run(command, check=True)
 
 
-@app.command()
-def shift(paths: list[Path]):
-    for path in paths:
-        shift_srt(path)
-
-
+@app.command(name='shift')
+@batch_processor(recursive=False)
 def shift_srt(input_srt: Path):
     offset = Prompt.ask(f'enter the time to shift {input_srt}')
     if not offset:
@@ -260,11 +248,7 @@ def shift_srt(input_srt: Path):
      .output(filename=str(input_srt.with_stem(stem)), c='copy').run())
 
 
-@app.command()
-def merge(path: Path):
-    merge_srt_folder(path)
-
-
+@app.command(name='merge')
 def merge_srt_folder(folder: Path):
     """
     Merge all SRT files directly under the given folder into 'merged.srt'.
@@ -301,12 +285,8 @@ def merge_srt_folder(folder: Path):
 
 
 @app.command()
-def lrc2srt(paths: list[Path]):
-    for path in paths:
-        lrc2srt_single(path)
-
-
-def lrc2srt_single(lrc_path: Path):
+@batch_processor(recursive=False)
+def lrc2srt(lrc_path: Path):
     if lrc_path.suffix != '.lrc':
         return
     subs_list = []
