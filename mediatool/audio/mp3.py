@@ -7,7 +7,7 @@ from rich.prompt import Prompt
 from typer import Typer
 
 from mediatool import DATA_PATH, console
-from mediatool.helper import get_stream_info, get_video_path
+from mediatool.helper import batch_processor, get_stream_info
 from mediatool.metadata import read_metadata
 
 app = Typer()
@@ -24,12 +24,6 @@ def flac2m4a(audios: list[Path]):
                    "-c:a", "alac", "-c:v", "copy",
                    "-map_metadata", "0", str(m4a)]
         subprocess.run(command, check=True)
-
-
-@app.command()
-def to_audio(paths: list[Path]):
-    for video in get_video_path(paths):
-        convert_video_to_m4a(video)
 
 
 def write_id3(m4a_file, meta: dict[str, str]):
@@ -49,6 +43,8 @@ def write_id3(m4a_file, meta: dict[str, str]):
     audio.save()
 
 
+@app.command(name='to-audio')
+@batch_processor()
 def convert_video_to_m4a(video_path: Path):
     video_path = Path(video_path)
     m4a_file = video_path.with_suffix('.m4a')

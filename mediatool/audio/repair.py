@@ -5,7 +5,7 @@ from rich.prompt import Confirm
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import get_stream_info, get_video_path
+from mediatool.helper import batch_processor, get_stream_info
 from mediatool.metadata import FFmpegMeta
 
 app = Typer()
@@ -49,12 +49,8 @@ def shift_audio(input_path: Path, offset: float):
     subprocess.run(cmd, check=True)
 
 
-@app.command()
-def mono(paths: list[Path]):
-    for video in get_video_path(paths):
-        convert_audio_to_mono(video)
-
-
+@app.command(name='mono')
+@batch_processor()
 def convert_audio_to_mono(filepath: Path):
     audio_info, *_ = get_stream_info(filepath)['audio']
     assert not _
@@ -76,12 +72,8 @@ def convert_audio_to_mono(filepath: Path):
     console.log(f'saved to {dst}')
 
 
-@app.command()
-def fix_phase(paths: list[Path]):
-    for video in get_video_path(paths):
-        fix_audio_phase(video)
-
-
+@app.command(name='fix-phase')
+@batch_processor()
 def fix_audio_phase(filepath: Path):
     dst = filepath.with_stem(filepath.stem+'_phased')
     if dst.exists():

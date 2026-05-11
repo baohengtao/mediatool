@@ -8,18 +8,14 @@ from rich.prompt import Confirm, Prompt
 from typer import Typer
 
 from mediatool import console
-from mediatool.helper import get_stream_info, get_video_path
+from mediatool.helper import batch_processor, get_stream_info, get_video_path
 from mediatool.metadata import FFmpegMeta
 
 app = Typer()
 
 
-@app.command()
-def to_h264(paths: list[Path]):
-    for video in get_video_path(paths):
-        convert_to_h264(video)
-
-
+@app.command(name='to-h264')
+@batch_processor()
 def convert_to_h264(video: Path):
     vstream, *_ = get_stream_info(video)['video']
     assert not _
@@ -96,13 +92,9 @@ def reencoding_video(target_video: Path,  reference_video: Path = None):
     command.run()
 
 
-@app.command()
-def watermark(paths: list[Path], add_mask: bool = False, crop: bool = False):
-    for video in get_video_path(paths):
-        add_watermark(video, add_mask=add_mask, crop=crop)
-
-
-def add_watermark(video: Path, add_mask=False, crop=False):
+@app.command(name='watermark')
+@batch_processor()
+def add_watermark(video: Path, add_mask: bool = False, crop: bool = False):
     console.log(f'processing {video}')
     if video.stem.endswith('_watermark'):
         console.log(f'{video} already has watermark, skip...')
