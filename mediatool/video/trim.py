@@ -4,15 +4,14 @@ from pathlib import Path
 
 import ffmpeg
 import pendulum
-from pypinyin import lazy_pinyin
 from rich.prompt import Confirm, Prompt
 from send2trash import send2trash
 from typer import Typer
 
 from mediatool import console
 from mediatool.helper import (
+    batch_processor,
     get_stream_info,
-    get_video_path,
     merge_intervals,
     rename_video,
     secs_to_timestr,
@@ -25,18 +24,10 @@ from .concat import concat_ts
 app = Typer()
 
 
-@app.command()
-def split(input_files: list[Path], change_artist: bool = False):
-    input_files = list(get_video_path(input_files))
-    input_files.sort(key=lambda x: hanzi_sort_key(x.name))
-    for input_file in input_files:
-        split_video(input_file, change_artist)
-
-
-def split_video(input_file: Path, change_artist=False):
-    if input_file.suffix == '.ts':
-        split_video_pure(input_file)
-        return
+@app.command(name='split')
+@batch_processor()
+def split_video(input_file: Path, change_artist: bool = False):
+    assert input_file.suffix != '.ts'
     meta = read_metadata(input_file, with_sound=False)
     if change_artist or meta.get('artist') in ['文艺中国', '爆米花戏曲', '越剧小虎']:
         meta.pop('artist', None)
@@ -87,13 +78,8 @@ def split_video(input_file: Path, change_artist=False):
         send2trash(input_file)
 
 
-@app.command()
-def split_pure(input_files: list[Path]):
-    input_files.sort(key=lambda x: hanzi_sort_key(x.name))
-    for input_file in input_files:
-        split_video_pure(input_file)
-
-
+@app.command(name='split-pure')
+@batch_processor(recursive=False)
 def split_video_pure(input_file: Path):
     while info := Prompt.ask(f'Enter time point {input_file}').strip():
         if '-' in info:
@@ -103,13 +89,8 @@ def split_video_pure(input_file: Path):
         run_split_command(input_file, ss=ss, to=to)
 
 
-@app.command()
-def split_multi(input_files: list[Path]):
-    input_files.sort(key=lambda x: hanzi_sort_key(x.name))
-    for input_file in input_files:
-        split_video_multi(input_file)
-
-
+@app.command(name='split-multi')
+@batch_processor(recursive=False)
 def split_video_multi(input_file: Path):
     folder = input_file.with_name(input_file.stem)
     if folder.exists() and any(folder.iterdir()):
@@ -134,13 +115,8 @@ def split_video_multi(input_file: Path):
         run_split_command(input_file, part_path, **arg)
 
 
-@app.command()
-def trim(input_files: list[Path]):
-    input_files.sort(key=lambda x: hanzi_sort_key(x.name))
-    for input_file in input_files:
-        trim_video_segments(input_file)
-
-
+@app.command(name='trim')
+@batch_processor(recursive=False)
 def trim_video_segments(video_path: Path):
     trim_info = video_path.with_name(f'{video_path.stem}_trim.txt')
     if trim_info.exists():
@@ -212,12 +188,6 @@ def run_split_command(input_file: Path, output_file: Path = None,
     console.log(f'Running:{" ".join(command)}')
     subprocess.run(command, check=True)
     return output_file
-
-
-def hanzi_sort_key(name):
-    pinyin = lazy_pinyin(name)
-    prefix = int(pinyin[0] != name)
-    return (prefix, pinyin)
 
 
 def nearest_keyframe(input_file: Path, target_time: float):

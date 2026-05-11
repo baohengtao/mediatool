@@ -2,6 +2,7 @@ import asyncio
 import fractions
 import inspect
 import itertools
+import re
 from collections import defaultdict
 from copy import deepcopy
 from functools import wraps
@@ -10,10 +11,30 @@ from typing import Any, Generator
 
 import ffmpeg
 import pendulum
+from pypinyin import lazy_pinyin
 from rich.prompt import Confirm, Prompt
 
 from mediatool import console
 from mediatool.metadata import read_metadata, write_metadata
+
+
+def natural_sort_key(text: str) -> list[tuple]:
+    """Base string-to-pinyin-natural-key logic."""
+    tokens = re.findall(r'\d+|.', text)
+    final_key = []
+    for token in tokens:
+        if token.isdigit():
+            final_key.append((0, int(token)))
+        elif ord(token) < 128:
+            final_key.append((1, token.lower(), token))
+        else:
+            py = lazy_pinyin(token)[0].lower()
+            final_key.append((2, py, token))
+    return final_key
+
+
+def path_sort_key(path: Path) -> list[list[tuple]]:
+    return [natural_sort_key(part) for part in path.parts]
 
 
 def batch_processor(recursive: bool = True):
@@ -21,7 +42,7 @@ def batch_processor(recursive: bool = True):
         def wrapper(paths: list[Path], *args: Any, **kwargs: Any):
             if recursive:
                 paths = get_video_path(paths)
-            for video in paths:
+            for video in sorted(paths, key=path_sort_key):
                 func(video, *args, **kwargs)
         wrapper.__name__ = func.__name__
         wrapper.__doc__ = func.__doc__
@@ -117,9 +138,7 @@ def run_async(func):
     def wrapper(*args, **kwargs):
         async def coro_wrapper():
             return await func(*args, **kwargs)
-
         return asyncio.run(coro_wrapper())
-
     return wrapper
 
 
@@ -130,7 +149,7 @@ def timestr_to_secs(timestr: str):
 
 def get_video_path(path: Path | list[Path]) -> Generator[Path]:
     if isinstance(path, list):
-        for p in sorted(path):
+        for p in sorted(path, key=path_sort_key):
             yield from get_video_path(p)
         return
     if not path.exists():
@@ -139,10 +158,10 @@ def get_video_path(path: Path | list[Path]) -> Generator[Path]:
     media_ext = ('.mp4', '.ts', '.mkv')
     files = []
     paths = [path] if path.is_file() else path.iterdir()
-    for p in sorted(paths):
+    for p in sorted(paths, key=path_sort_key):
         if any(part.startswith('.') for part in p.parts):
             continue
-        elif p.is_file():
+        if p.is_file():
             if not p.suffix.lower().endswith(media_ext):
                 continue
             p_strip = p.parent/(p.name.lstrip())
@@ -153,7 +172,7 @@ def get_video_path(path: Path | list[Path]) -> Generator[Path]:
         elif p.is_dir():
             yield from get_video_path(p)
 
-    yield from sorted(files)
+    yield from sorted(files, key=path_sort_key)
 
 
 def get_stream_info(video_path) -> dict[str]:
