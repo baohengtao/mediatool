@@ -157,17 +157,21 @@ def trim_video_segments(video_path: Path):
 def run_split_command(input_file: Path, output_file: Path = None,
                       ss: str = '', to: str = '', meta: dict = None) -> Path:
     assert ss or to
-    command = ['ffmpeg']
-    if ss:
-        ss2 = nearest_keyframe(input_file, ss)
-        console.log(f'find nearest keyframe of {ss} at {ss2}')
-        if not ss2:
-            console.log(f'ss2={ss2}, failed', style='error')
-        ss = ss2 or ss
-        command += ['-ss', str(ss)]
+    ss = nearest_keyframe(input_file, ss) if ss else ''
+    if output_file is None:
+        output_file = input_file.with_stem(input_file.stem+'_'+ss+'_'+to)
+    ss = timestr_to_secs(ss) if ss else 0
+    to = timestr_to_secs(to) if to else None
+    # HYBRID SEEKING (Fast Jump + Accurate Scan)
+    # 1. '-ss {delta} -i' jumps instantly to save time/SSD read.
+    # 2. Second '-ss' creates a "buffer" to wake up the metadata engine.
+    # 3. This forces FFmpeg to TRUNCATE chapters at the '-to' point,
+    #    preventing ghost chapters from exceeding the video length.
+    delta = max(ss-600, 0)
+    command = ['ffmpeg', '-ss', str(delta),
+               '-i', str(input_file), '-ss', str(ss-delta)]
     if to:
-        command += ['-to', str(to)]
-    command += ['-i', str(input_file)]
+        command += ['-to', str(to-delta)]
     command += ['-map', '0:v', '-map', '0:a']
 
     stream_info = get_stream_info(input_file)
@@ -178,8 +182,6 @@ def run_split_command(input_file: Path, output_file: Path = None,
     if stream_info.get('subtitle'):
         command += ['-map', '0:s']
 
-    if output_file is None:
-        output_file = input_file.with_stem(input_file.stem+'_'+ss+'_'+to)
     scodec = 'mov_text' if input_file.suffix == '.mp4' else 'srt'
     command += get_metadata_args(meta or {}, keep_sound=False)
     command += ['-c', 'copy', '-c:s', scodec,
@@ -190,7 +192,7 @@ def run_split_command(input_file: Path, output_file: Path = None,
     return output_file
 
 
-def nearest_keyframe(input_file: Path, target_time: float):
+def nearest_keyframe(input_file: Path, target_time: float) -> str:
     """
     Returns nearest keyframe timestamp <= target_time in seconds
     using ffprobe via subprocess.
@@ -219,9 +221,7 @@ def nearest_keyframe(input_file: Path, target_time: float):
     for line in result.stdout.strip().splitlines():
         if m := re.match(r'\s*(\d+(?:\.\d+)?)', line):
             keyframes.append(float(m.group(1)))
-
     # Pick the largest keyframe <= target_time
     nearest = max((kf for kf in keyframes if kf <=
                   target_time), default=keyframes[0])
-    nearest = secs_to_timestr(nearest)
-    return nearest
+    return secs_to_timestr(nearest)

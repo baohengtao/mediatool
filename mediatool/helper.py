@@ -142,7 +142,7 @@ def run_async(func):
     return wrapper
 
 
-def timestr_to_secs(timestr: str):
+def timestr_to_secs(timestr: str) -> float:
     timestr = timestr.strip().split(':')
     return sum(float(x)*60**i for i, x in enumerate(timestr[::-1]))
 
