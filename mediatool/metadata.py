@@ -1,3 +1,4 @@
+import re
 import subprocess
 from pathlib import Path
 
@@ -85,14 +86,18 @@ def read_metadata(video: Path, with_sound: bool, fix_mode: bool = False) -> dict
 
 
 def get_metadata_args(metadata: dict[str, str], keep_sound: bool) -> list[str]:
+    if timestamp := metadata.get('creation_time'):
+        if re.match(r'^\d{4}:\d{2}:\d{2}\s\d{2}:\d{2}:\d{2}$', timestamp):
+            dt = pendulum.from_format(
+                timestamp, 'YYYY:MM:DD HH:mm:ss', tz='local')
+            metadata['creation_time'] = dt.to_iso8601_string()
     if not keep_sound:
         empty_sound = {'loudness': '', 'loudnorm': ''}
         assert metadata | empty_sound == empty_sound | metadata
         metadata |= empty_sound
-    args = []
+    args = FFmpegMeta.KEEP_META.copy()
     for k, v in metadata.items():
         args += ["-metadata", f"{k}={v}"]
-    args += FFmpegMeta.KEEP_META
     return args
 
 
