@@ -63,7 +63,8 @@ def convert_xmp_to_metadata(xmp: dict[str, str]) -> dict[str, str]:
         'XMP:BlogURL': 'blog_url',
         'XMP:URLUrl': 'url',
         'XMP:Volume': 'loudness',
-        'QuickTime:Information': 'loudnorm'
+        'QuickTime:Information': 'loudnorm',
+        'Rotation': 'rotation'
     }
     res = {maps[k]: v for k, v in xmp.items()}
     assert len(res) == len(xmp)

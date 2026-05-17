@@ -46,10 +46,13 @@ def concat_ts(path: Path) -> Path | None:
         command += ['-i', str(chapters_file), '-map_chapters', '2']
 
     meta_info = {}
+    if (meta_file := path/'meta.json').exists():
+        meta_info = json.loads(meta_file.read_text())
     if (xmp_file := path / 'xmp.json').exists():
+        assert not meta_info
         meta_info = json.loads(xmp_file.read_text())
-        assert meta_info.pop('Rotation', 0) == 0
         meta_info = convert_xmp_to_metadata(meta_info)
+    assert meta_info.pop('rotation', 0) == 0
     command += get_metadata_args(meta_info, keep_sound=False)
     command += ['-c', 'copy', '-map', '1', str(merged)]
     print(f'Running: {' '.join(command)}')
@@ -138,15 +141,18 @@ def fix_ts(path: Path, to_ts: bool = False, flac: bool = False):
     else:
         new_path.mkdir(exist_ok=True)
     meta_info, rotation = {}, 0
+    if (meta_file := path/'meta.json').exists():
+        meta_info = json.loads(meta_file.read_text())
     if (xmp_file := path/'xmp.json').exists():
+        assert not meta_info
         meta_info = json.loads(xmp_file.read_text())
-        if not to_ts:
-            rotation = meta_info.pop('Rotation', 0)
-            rotation = (360-rotation) % 360
         meta_info = convert_xmp_to_metadata(meta_info)
+    if not to_ts:
+        rotation = meta_info.pop('rotation', 0)
+        rotation = (360-rotation) % 360
     files = sorted(path.iterdir()) if path.is_dir() else [path]
     for video in sorted(files):
-        if video.name in ['.DS_Store', 'xmp.json']:
+        if video.name in ['.DS_Store', 'xmp.json', 'meta.json']:
             continue
         if video.suffix in ['.mp4', '.ts', '.mov', '.mkv', '.webm']:
             suf = '.ts' if to_ts else '.mp4'
