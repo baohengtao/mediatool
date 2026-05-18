@@ -36,17 +36,10 @@ def split_video(input_file: Path, change_artist: bool = False):
             return
     console.log(f'file:"{input_file}"')
     i = 0
-    is_entire = False
     while info := Prompt.ask(f'Enter time point and title of {input_file}').strip():
-        if len(pt := info.strip().split()) == 2:
-            point, title = pt
-        elif len(pt) == 1:
-            title = pt[0]
-            point = '-'
-            if not Confirm.ask(f'rename entire file with {title}?'):
-                continue
-            is_entire = True
-        else:
+        *point, title = info.strip().split()
+        point, *_ = point or ['-']
+        if _:
             console.log('Enter title and time', style='error')
             continue
         while not meta.get('artist'):
@@ -62,17 +55,12 @@ def split_video(input_file: Path, change_artist: bool = False):
                     v, 'YYYY:MM:DD HH:mm:ss', tz='local').to_iso8601_string()
             meta[k] = v
         i += 1
-        xmp = meta | {'title': title}
+        meta_part = meta | {'title': title}
         ss, to = point.split('-')
-        if ss and to:
-            part_path = input_file.with_stem(input_file.stem+'_tmp')
-            run_split_command(input_file, part_path, ss, to, meta=xmp)
-        else:
-            part_path = input_file
+        part_path = input_file.with_stem(input_file.stem+'_tmp')
+        run_split_command(input_file, part_path, ss, to, meta=meta_part)
         part_path = rename_video(part_path, fix=True)
         console.log(f'Part {i} saved to {part_path}')
-        if is_entire:
-            return
     if Confirm.ask('Delete original file?'):
         console.log(f'move to trash: {input_file}')
         send2trash(input_file)
@@ -156,7 +144,6 @@ def trim_video_segments(video_path: Path):
 
 def run_split_command(input_file: Path, output_file: Path = None,
                       ss: str = '', to: str = '', meta: dict = None) -> Path:
-    assert ss or to
     ss = nearest_keyframe(input_file, ss) if ss else ''
     if output_file is None:
         output_file = input_file.with_stem(input_file.stem+'_'+ss+'_'+to)
